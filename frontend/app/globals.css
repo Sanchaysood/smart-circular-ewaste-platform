@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* tokens */
+:root{
+  --brand-green:#10b981;
+  --brand-blue:#3b82f6;
+}
+html,body{ @apply bg-slate-50 text-slate-900; }
+
+/* logo cap */
+img[alt="logo"], img[alt="E-Waste Logo"]{
+  max-width:48px; max-height:48px; @apply rounded-md;
+}
+
+/* UI helpers you use */
+.navbar{ @apply bg-white border-b border-slate-200; }
+.card{ @apply bg-white rounded-2xl border border-slate-200 shadow-[0_8px_30px_rgba(2,8,23,0.06)]; }
+.card-hover{ @apply transition-transform duration-200; }
+.card-hover:hover{ transform: translateY(-1px); }
+.label{ @apply text-sm font-medium text-slate-700; }
+.input{ @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-slate-400; }
+.btn{ @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium; }
+.btn-ghost{ @apply btn border border-slate-200 bg-white hover:bg-slate-50; }
+.btn-danger{ @apply btn bg-red-600 text-white hover:bg-red-700; }
+.btn-primary{
+  @apply inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-white text-sm font-semibold transition;
+  background: linear-gradient(135deg,var(--brand-blue),var(--brand-green));
+}
+.btn-primary:hover{ filter:brightness(0.97); }
+.tab{ @apply px-4 py-1.5 rounded-full text-sm font-semibold transition; }
+.tab-active{ @apply bg-slate-900 text-white shadow; }
+.tab-passive{ @apply bg-slate-100 text-slate-700 hover:bg-slate-200; }
+.badge{ @apply inline-flex items-center rounded-full bg-slate-100 text-slate-700 px-2.5 py-1 text-xs; }
+.divider{ @apply h-px w-full bg-slate-200; }
+.brand-text{ @apply bg-clip-text text-transparent; background-image: linear-gradient(135deg,#0f172a,#3b82f6); }
