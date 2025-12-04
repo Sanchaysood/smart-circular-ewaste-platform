@@ -8,6 +8,17 @@ import os
 import pickle
 import uuid
 
+# --- added for model inference (safe/optional) ---
+import time
+from PIL import Image
+
+try:
+    from ultralytics import YOLO
+    ULTRALYTICS_AVAILABLE = True
+except Exception:
+    ULTRALYTICS_AVAILABLE = False
+# --------------------------------------------------
+
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
@@ -24,6 +35,9 @@ BASE_DIR = os.path.dirname(__file__)
 SECRET_KEY = "change-this-in-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 12
+
+# Optional: expected Google OAuth client ID (set as env var in production)
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
 
 DB_URL = "sqlite:///" + os.path.join(BASE_DIR, "ewaste.db")
 MODELS_DIR = os.path.join(BASE_DIR, "models")
@@ -162,6 +176,42 @@ PRICE_MODEL = load_pickle(os.path.join(MODELS_DIR, "price_model.pkl"))
 RUL_MODEL = load_pickle(os.path.join(MODELS_DIR, "rul_model.pkl"))
 DECISION_MODEL = load_pickle(os.path.join(MODELS_DIR, "decision_model.pkl"))
 
+# ---------------------------------------------------------------------
+# Load YOLO detection model (optional, safe)
+# ---------------------------------------------------------------------
+YOLO_MODEL = None
+YOLO_MODEL_NAME = None
+
+
+def try_load_yolo_model():
+    global YOLO_MODEL, YOLO_MODEL_NAME
+    if not ULTRALYTICS_AVAILABLE:
+        print("[startup] ultralytics not available; skipping YOLO load")
+        return
+    if not os.path.isdir(MODELS_DIR):
+        print(f"[startup] models dir not found: {MODELS_DIR}")
+        return
+    candidates = [f for f in os.listdir(MODELS_DIR) if f.endswith(".pt") or f.endswith(".onnx")]
+    if not candidates:
+        print("[startup] no .pt/.onnx files found in models dir")
+        return
+    chosen = None
+    for c in candidates:
+        if "yolo" in c.lower() or "yolov8" in c.lower() or "best" in c.lower():
+            chosen = c
+            break
+    if chosen is None:
+        chosen = candidates[0]
+    path = os.path.join(MODELS_DIR, chosen)
+    try:
+        YOLO_MODEL = YOLO(path)
+        YOLO_MODEL_NAME = chosen
+        print(f"[startup] Loaded YOLO model: {chosen}")
+    except Exception as e:
+        YOLO_MODEL = None
+        YOLO_MODEL_NAME = None
+        print(f"[startup] Failed to load YOLO model {path}: {e}")
+
 
 # -----------------------------------------------------------------------------
 # SCHEMAS
@@ -178,12 +228,17 @@ class TokenOut(BaseModel):
     name: str
 
 
+class GoogleAuthIn(BaseModel):
+    id_token: str
+
+
 # -----------------------------------------------------------------------------
 # STARTUP + HEALTH
 # -----------------------------------------------------------------------------
 @app.on_event("startup")
 def _startup():
     init_db()
+    try_load_yolo_model()
 
 
 @app.get("/health")
@@ -215,6 +270,50 @@ def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     user = db.query(User).filter(User.email == email).first()
     if not user or user.password_hash != sha256(form.password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    token = create_access_token({"sub": user.email})
+    return TokenOut(access_token=token, name=user.name)
+
+
+# -----------------------------------------------------------------------------
+# Google Sign-In (frontend obtains Google id_token and POSTs it here)
+# -----------------------------------------------------------------------------
+# NOTE: original code referenced id_token and google_requests which may need
+# `google-auth` library; keep unchanged here (the original function will error
+# if those libs aren't installed). If you use Google Sign-In, ensure imports:
+#   from google.oauth2 import id_token
+#   from google.auth.transport import requests as google_requests
+#
+try:
+    from google.oauth2 import id_token as _id_token  # type: ignore
+    from google.auth.transport import requests as _google_requests  # type: ignore
+    _google_libs_available = True
+except Exception:
+    _google_libs_available = False
+
+@app.post("/auth/google", response_model=TokenOut)
+def auth_google(payload: GoogleAuthIn, db: Session = Depends(get_db)):
+    if not _google_libs_available:
+        raise HTTPException(status_code=500, detail="Google auth libs not installed on server")
+    try:
+        aud = GOOGLE_CLIENT_ID if GOOGLE_CLIENT_ID else None
+        idinfo = _id_token.verify_oauth2_token(payload.id_token, _google_requests.Request(), audience=aud)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid Google ID token")
+
+    email = idinfo.get("email")
+    if not email:
+        raise HTTPException(status_code=400, detail="Google token did not contain an email")
+
+    name = idinfo.get("name") or email.split("@")[0]
+
+    # Create user if doesn't exist
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        # create a local user with a random password hash (Google users authenticate via Google)
+        db.add(User(name=name, email=email, password_hash=sha256(uuid.uuid4().hex)))
+        db.commit()
+        user = db.query(User).filter(User.email == email).first()
+
     token = create_access_token({"sub": user.email})
     return TokenOut(access_token=token, name=user.name)
 
@@ -256,30 +355,64 @@ def nearby_partners(lat: Optional[float], lon: Optional[float]) -> List[Dict[str
     return [
         {"name": "GreenTech Recyclers", "lat": lat + 0.01, "lon": lon + 0.01},
         {"name": "FixIt Repair Hub", "lat": lat - 0.008, "lon": lon + 0.006},
-        {"name": "EcoCycle Center", "lat": lat + 0.004, "lon": lon - 0.012},
+        {"name": "EcoCycle Center", "lat": lat + 0.004, "lon": lat - 0.012},
     ]
+
+
+# -------------------------
+# Helper coercion functions
+# -------------------------
+def safe_float(s: Optional[str], default: Optional[float] = None) -> Optional[float]:
+    if s is None:
+        return default
+    if isinstance(s, (int, float)):
+        return float(s)
+    try:
+        s2 = str(s).strip()
+        if s2 == "":
+            return default
+        return float(s2)
+    except Exception:
+        return default
+
+
+def safe_int(s: Optional[str], default: Optional[int] = None) -> Optional[int]:
+    if s is None:
+        return default
+    if isinstance(s, int):
+        return s
+    try:
+        s2 = str(s).strip()
+        if s2 == "":
+            return default
+        return int(float(s2))
+    except Exception:
+        return default
 
 
 # -----------------------------------------------------------------------------
 # LISTINGS: create (multipart, authenticated) + list mine + delete + dedupe
+# NOTE: Many form inputs are accepted as strings to avoid FastAPI 422 when the
+# frontend sends empty strings. We coerce them safely below.
 # -----------------------------------------------------------------------------
 @app.post("/listings/create")
 def create_listing(
-    category: str = Form(...),
-    brand: str = Form(""),
-    model: str = Form(""),
-    age_months: Optional[float] = Form(None),
-    original_price: Optional[float] = Form(None),
-    defect_count: Optional[int] = Form(0),
-    battery_health: Optional[float] = Form(None),
-    storage_gb: Optional[int] = Form(None),
-    ram_gb: Optional[int] = Form(None),
-    screen_issues: Optional[int] = Form(0),
-    body_issues: Optional[int] = Form(0),
+    # changed to optional strings/defaults to avoid 422 on empty strings from frontend
+    category: Optional[str] = Form("mobile"),
+    brand: Optional[str] = Form(""),
+    model: Optional[str] = Form(""),
+    age_months: Optional[str] = Form(None),
+    original_price: Optional[str] = Form(None),
+    defect_count: Optional[str] = Form("0"),
+    battery_health: Optional[str] = Form(None),
+    storage_gb: Optional[str] = Form(None),
+    ram_gb: Optional[str] = Form(None),
+    screen_issues: Optional[str] = Form("0"),
+    body_issues: Optional[str] = Form("0"),
     accessories: Optional[str] = Form(""),
     city: Optional[str] = Form(""),
-    lat: Optional[float] = Form(None),
-    lon: Optional[float] = Form(None),
+    lat: Optional[str] = Form(None),
+    lon: Optional[str] = Form(None),
     image: UploadFile = File(...),
     user: User = Depends(require_user),
     db: Session = Depends(get_db),
@@ -300,22 +433,34 @@ def create_listing(
     with open(save_path, "wb") as f:
         f.write(raw_bytes)
 
+    # coerce form values safely
+    c_age = safe_float(age_months, None)
+    c_orig_price = safe_float(original_price, None)
+    c_defect_count = safe_int(defect_count, 0)
+    c_battery = safe_float(battery_health, None)
+    c_storage = safe_int(storage_gb, None)
+    c_ram = safe_int(ram_gb, None)
+    c_screen = safe_int(screen_issues, 0)
+    c_body = safe_int(body_issues, 0)
+    c_lat = safe_float(lat, None)
+    c_lon = safe_float(lon, None)
+
     payload = {
-        "category": category,
-        "brand": brand,
-        "model": model,
-        "age_months": age_months,
-        "original_price": original_price,
-        "defect_count": defect_count,
-        "battery_health": battery_health,
-        "storage_gb": storage_gb,
-        "ram_gb": ram_gb,
-        "screen_issues": screen_issues,
-        "body_issues": body_issues,
-        "accessories": accessories,
-        "city": city,
-        "lat": lat,
-        "lon": lon,
+        "category": (category or "mobile"),
+        "brand": (brand or ""),
+        "model": (model or ""),
+        "age_months": c_age,
+        "original_price": c_orig_price,
+        "defect_count": c_defect_count,
+        "battery_health": c_battery,
+        "storage_gb": c_storage,
+        "ram_gb": c_ram,
+        "screen_issues": c_screen,
+        "body_issues": c_body,
+        "accessories": (accessories or ""),
+        "city": (city or ""),
+        "lat": c_lat,
+        "lon": c_lon,
     }
 
     # De-duplication key (user + brand/model + image content)
@@ -331,9 +476,122 @@ def create_listing(
     if existing:
         raise HTTPException(status_code=409, detail="Duplicate listing detected")
 
-    # Predictions
-    result = demo_predictions(payload)
-    result["nearby_partners"] = nearby_partners(lat, lon)
+    # -------------------------
+    # Run detection model (if available) else demo predictions
+    # -------------------------
+    result = None
+    detections: List[Dict[str, Any]] = []
+    model_used = None
+    inference_ms = None
+
+    if ULTRALYTICS_AVAILABLE and YOLO_MODEL is not None:
+        try:
+            t0 = time.time()
+            # run inference - conf threshold tunable
+            yres = YOLO_MODEL.predict(source=save_path, imgsz=640, conf=0.25, iou=0.45, verbose=False)
+            inference_ms = int((time.time() - t0) * 1000)
+
+            if len(yres) > 0:
+                r0 = yres[0]
+                boxes = getattr(r0, "boxes", None)
+                # get natural image size if available in result, else open with PIL
+                try:
+                    nat_h, nat_w = r0.orig_shape  # sometimes (h,w,c)
+                except Exception:
+                    try:
+                        with Image.open(save_path) as im:
+                            nat_w, nat_h = im.width, im.height
+                    except Exception:
+                        nat_w, nat_h = None, None
+
+                names = getattr(r0, "names", None)
+                if names is None:
+                    # try model-level names
+                    try:
+                        names = YOLO_MODEL.model.names
+                    except Exception:
+                        names = {}
+
+                if boxes is not None:
+                    for b in boxes:
+                        # xyxy might be tensor; try to convert robustly
+                        try:
+                            xyxy = b.xyxy.tolist()[0] if hasattr(b.xyxy, "tolist") else list(map(float, b.xyxy))
+                        except Exception:
+                            # fallback: convert each element
+                            try:
+                                xy = [float(x) for x in b.xyxy]
+                                xyxy = xy
+                            except Exception:
+                                continue
+                        try:
+                            conf = float(b.conf.tolist()[0]) if hasattr(b.conf, "tolist") else float(b.conf)
+                        except Exception:
+                            conf = float(getattr(b, "conf", 0.0))
+                        try:
+                            cls_id = int(b.cls.tolist()[0]) if hasattr(b.cls, "tolist") else int(b.cls)
+                        except Exception:
+                            cls_id = int(getattr(b, "cls", 0))
+                        raw_label = names.get(cls_id, str(cls_id))
+                        x1, y1, x2, y2 = xyxy
+                        # if nat size available, normalize; else attempt fallback to image size
+                        if nat_w and nat_h:
+                            nx1, ny1, nx2, ny2 = x1 / nat_w, y1 / nat_h, x2 / nat_w, y2 / nat_h
+                        else:
+                            # try get image size via PIL
+                            try:
+                                with Image.open(save_path) as im:
+                                    nw, nh = im.width, im.height
+                                nx1, ny1, nx2, ny2 = x1 / nw, y1 / nh, x2 / nw, y2 / nh
+                            except Exception:
+                                # leave absolute coords (frontend checks for normalized)
+                                nx1, ny1, nx2, ny2 = x1, y1, x2, y2
+                        detections.append({
+                            "label": raw_label,
+                            "confidence": conf,
+                            "bbox": [nx1, ny1, nx2, ny2]
+                        })
+            model_used = YOLO_MODEL_NAME
+        except Exception as e:
+            print(f"[inference] model failed: {e}")
+            detections = []
+            model_used = None
+
+    # Build result: if model produced detections use that, else demo
+    if detections:
+        top = sorted(detections, key=lambda x: x.get("confidence", 0), reverse=True)[0]
+
+        def friendly_map(raw):
+            m = {
+                "glass_crack": "Screen crack",
+                "scratch": "Scratch",
+                "bent": "Bent frame",
+                "body_damage": "Body damage",
+                "pixel_defect": "Display defect",
+            }
+            return m.get(raw, raw)
+
+        result = {
+            "method": "yolov8" if model_used else "demo",
+            "model_name": model_used,
+            "inference_ms": inference_ms,
+            "detections": detections,
+            "image_condition": {"label": friendly_map(top.get("label")), "confidence": top.get("confidence", 0)},
+            "predictions": {}
+        }
+        pseudo_payload = payload.copy()
+        pseudo_payload["detected_defects_count"] = len(detections)
+        demo_res = demo_predictions(pseudo_payload)
+        result["predictions"] = demo_res.get("predictions", {})
+    else:
+        result = demo_predictions(payload)
+        result["method"] = "demo"
+        result["model_name"] = None
+        result["inference_ms"] = None
+        result["detections"] = []
+
+    # nearby partners
+    result["nearby_partners"] = nearby_partners(payload.get("lat"), payload.get("lon"))
 
     # Store in DB
     row = Listing(

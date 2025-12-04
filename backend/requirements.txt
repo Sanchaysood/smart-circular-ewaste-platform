@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+python-jose[cryptography]
+sqlalchemy
+pydantic
+python-multipart
+aiofiles
+google-auth
+google-auth-oauthlib

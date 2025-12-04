@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import axios from "axios";
 import toast from "react-hot-toast";
@@ -52,6 +52,43 @@ function TextField(props: {
 
 type AuthState = { token: string | null; name: string | null };
 
+/**
+ * Friendly explanations for classes the detector may output.
+ * Add/adjust labels to match your trained model classes.
+ */
+const labelInfo: Record<
+  string,
+  { explanation: string; reduction_pct?: number; short: string }
+> = {
+  glass_crack: {
+    explanation:
+      "Visible glass crack on front screen. Replacing glass/display is costly and reduces resale price.",
+    reduction_pct: 30,
+    short: "Screen crack",
+  },
+  "in-display-pixel-defect": {
+    explanation:
+      "Display/pixel/touch defects that affect usability and are expensive to repair.",
+    reduction_pct: 35,
+    short: "Display defect",
+  },
+  "body-damage": {
+    explanation: "Dents or large scratches on body reduce buyer confidence.",
+    reduction_pct: 20,
+    short: "Body damage",
+  },
+  battery_fault: {
+    explanation: "Low battery health reduces expected lifespan and resale value.",
+    reduction_pct: 15,
+    short: "Battery fault",
+  },
+  default: {
+    explanation: "Detected defect affecting appearance or functionality.",
+    reduction_pct: 15,
+    short: "Defect",
+  },
+};
+
 export default function NewListingPage() {
   const [auth, setAuth] = useState<AuthState>({ token: null, name: null });
   const [isLoading, setIsLoading] = useState(false);
@@ -63,23 +100,29 @@ export default function NewListingPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [form, setForm] = useState<any>({
-    category: "mobile",
-    brand: "",
+    brand: "Apple",
     model: "",
     age_months: "",
     original_price: "",
-    defect_count: 0,
     battery_health: "",
-    storage_gb: "",
-    ram_gb: "",
-    screen_issues: 0,
-    body_issues: 0,
-    accessories: "",
+    storage_gb: "64",
     city: "Bengaluru",
     lat: "",
     lon: "",
   });
   const [result, setResult] = useState<any>(null);
+  const [cropUrl, setCropUrl] = useState<string | null>(null);
+
+  const imgRef = useRef<HTMLImageElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const cropCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // ---------- defensive helper ----------
+  const isValidResult = (r: any) =>
+    r &&
+    typeof r === "object" &&
+    !Array.isArray(r) &&
+    ("predictions" in r || "image_condition" in r || "detections" in r || "nearby_partners" in r);
 
   // ---------- auth ----------
   useEffect(() => {
@@ -131,7 +174,6 @@ export default function NewListingPage() {
 
   // ---------- UX helpers ----------
   const requiredKeys: Array<keyof typeof form> = [
-    "category",
     "brand",
     "model",
     "age_months",
@@ -145,22 +187,190 @@ export default function NewListingPage() {
 
   const canSubmit = !!auth.token && !!file && missing.length === 0 && !isLoading;
 
-  const getLocation = () => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => {
-      setForm((f: any) => ({
-        ...f,
-        lat: String(pos.coords.latitude.toFixed(6)),
-        lon: String(pos.coords.longitude.toFixed(6)),
-      }));
-      toast.success("Location detected");
-    });
-  };
-
   const toNum = (v: any): number | undefined => {
     if (v === "" || v === null || v === undefined) return undefined;
     const n = Number(v);
     return Number.isFinite(n) ? n : undefined;
+  };
+
+  // draw boxes on canvas (top detection highlighted)
+  function drawBoxesOnCanvas(detections: any[] = []) {
+    const img = imgRef.current;
+    const canvas = canvasRef.current;
+    if (!img || !canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    // size canvas to displayed image
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.lineWidth = 2;
+
+    if (!detections || detections.length === 0) return;
+
+    // scaling from image natural size to displayed size
+    const sx = img.width / (img.naturalWidth || img.width);
+    const sy = img.height / (img.naturalHeight || img.height);
+
+    // find top detection by confidence
+    const sorted = [...detections].sort(
+      (a, b) => (b.confidence ?? b.score ?? 0) - (a.confidence ?? a.score ?? 0)
+    );
+    const top = sorted[0];
+
+    sorted.forEach((d: any, i: number) => {
+      let bbox = d.bbox || d.box || null;
+      if (!bbox || bbox.length < 4) return;
+      // If bbox appears normalized (all values between 0 and 1), convert to pixels.
+      const isNormalized =
+        Array.isArray(bbox) && bbox.every((v: number) => typeof v === "number" && v >= 0 && v <= 1);
+      let [x1, y1, x2, y2] = bbox;
+      if (isNormalized) {
+        x1 = x1 * (img.naturalWidth || img.width);
+        y1 = y1 * (img.naturalHeight || img.height);
+        x2 = x2 * (img.naturalWidth || img.width);
+        y2 = y2 * (img.naturalHeight || img.height);
+      }
+      const rx = x1 * sx;
+      const ry = y1 * sy;
+      const rw = (x2 - x1) * sx;
+      const rh = (y2 - y1) * sy;
+
+      const isTop = top && top === d;
+      if (isTop) {
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = "#ff2d55"; // red for top
+        ctx.fillStyle = "#ff2d55";
+      } else {
+        ctx.lineWidth = 2;
+        const colors = ["#e6194b", "#3cb44b", "#ffe119", "#4363d8", "#f58231", "#911eb4", "#46f0f0"];
+        ctx.strokeStyle = colors[i % colors.length];
+        ctx.fillStyle = ctx.strokeStyle;
+      }
+
+      ctx.globalAlpha = 1.0;
+      ctx.strokeRect(rx, ry, rw, rh);
+
+      const label = d.label || d.name || "obj";
+      const conf = typeof d.confidence !== "undefined" ? d.confidence : (d.score || 0);
+      const txt = `${label} ${(conf || 0).toFixed(2)}`;
+      ctx.font = "14px Arial";
+      const textWidth = ctx.measureText(txt).width + 6;
+      const textHeight = 18;
+      ctx.globalAlpha = 0.85;
+      ctx.fillRect(rx, ry - textHeight, textWidth, textHeight);
+      ctx.globalAlpha = 1.0;
+      ctx.fillStyle = "#fff";
+      ctx.fillText(txt, rx + 3, ry - 4);
+    });
+  }
+
+  // generate a cropped thumbnail (data URL) for the most significant defect
+  function generateCropFromDetection(d: any) {
+    const img = imgRef.current;
+    if (!img || !d || !d.bbox) {
+      setCropUrl(null);
+      return;
+    }
+    // compute bbox in natural pixels
+    let [x1, y1, x2, y2] = d.bbox;
+    const isNormalized =
+      [x1, y1, x2, y2].every((v: number) => typeof v === "number" && v >= 0 && v <= 1);
+    const natW = img.naturalWidth || img.width;
+    const natH = img.naturalHeight || img.height;
+    if (isNormalized) {
+      x1 = x1 * natW;
+      y1 = y1 * natH;
+      x2 = x2 * natW;
+      y2 = y2 * natH;
+    }
+    // clamp
+    x1 = Math.max(0, Math.round(x1));
+    y1 = Math.max(0, Math.round(y1));
+    x2 = Math.min(natW, Math.round(x2));
+    y2 = Math.min(natH, Math.round(y2));
+    const w = Math.max(8, x2 - x1);
+    const h = Math.max(8, y2 - y1);
+
+    // use hidden canvas to draw image and crop
+    let c = cropCanvasRef.current;
+    if (!c) {
+      c = document.createElement("canvas");
+      cropCanvasRef.current = c;
+    }
+    // keep thumbnail reasonable size, max 300px width
+    const maxThumb = 300;
+    const scale = Math.min(1, maxThumb / w);
+    c.width = Math.round(w * scale);
+    c.height = Math.round(h * scale);
+    const ctx = c.getContext("2d");
+    if (!ctx) {
+      setCropUrl(null);
+      return;
+    }
+    // draw the crop from natural image coordinates
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, x1, y1, w, h, 0, 0, c.width, c.height);
+    // optional: add red border
+    ctx.strokeStyle = "#ff2d55";
+    ctx.lineWidth = 4;
+    ctx.strokeRect(0, 0, c.width, c.height);
+    const dataUrl = c.toDataURL("image/jpeg", 0.9);
+    setCropUrl(dataUrl);
+  }
+
+  useEffect(() => {
+    // whenever preview OR detections change, redraw and generate crop
+    drawBoxesOnCanvas(result?.detections || []);
+    if (result?.detections?.length) {
+      const top = [...result.detections].sort(
+        (a: any, b: any) => (b.confidence ?? b.score ?? 0) - (a.confidence ?? a.score ?? 0)
+      )[0];
+      const img = imgRef.current;
+      if (img && !img.naturalWidth) {
+        img.onload = () => generateCropFromDetection(top);
+      } else {
+        generateCropFromDetection(top);
+      }
+    } else {
+      setCropUrl(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview, result?.detections]);
+
+  // reverse geocode using Nominatim to fill city (free, must be used responsibly)
+  async function reverseGeocode(lat: number, lon: number) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`;
+      const res = await fetch(url, { headers: { "User-Agent": "SmartCircularE-Waste/1.0" } });
+      if (!res.ok) return null;
+      const data = await res.json();
+      // try to pick city -> town -> village -> county
+      const place = data?.address?.city || data?.address?.town || data?.address?.village || data?.address?.county;
+      return place || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  const getLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation not supported");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = Number(pos.coords.latitude.toFixed(6));
+        const lon = Number(pos.coords.longitude.toFixed(6));
+        const city = await reverseGeocode(lat, lon);
+        setForm((f: any) => ({ ...f, lat: String(lat), lon: String(lon), city: city || f.city }));
+        toast.success("Location detected");
+      },
+      (err) => {
+        toast.error("Unable to get location");
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
   };
 
   const submitListing = async (e: React.FormEvent) => {
@@ -175,18 +385,12 @@ export default function NewListingPage() {
 
     const fd = new FormData();
     const entries: Record<string, any> = {
-      category: form.category,
       brand: form.brand,
       model: form.model,
       age_months: toNum(form.age_months),
       original_price: toNum(form.original_price),
-      defect_count: toNum(form.defect_count),
       battery_health: toNum(form.battery_health),
-      storage_gb: toNum(form.storage_gb),
-      ram_gb: toNum(form.ram_gb),
-      screen_issues: toNum(form.screen_issues),
-      body_issues: toNum(form.body_issues),
-      accessories: form.accessories || "",
+      storage_gb: form.storage_gb,
       city: form.city || "",
       lat: toNum(form.lat),
       lon: toNum(form.lon),
@@ -204,14 +408,53 @@ export default function NewListingPage() {
           "Content-Type": "multipart/form-data",
         },
       });
-      setResult(data);
+
+      // set result safely
+      setResult(data || null);
       toast.success("Uploaded & predicted");
+
+      // use backend-served image to match inference
+      if (data?.image?.path) {
+        const backendImageUrl = `${API.replace(/\/$/, "")}/uploads/${data.image.path}`;
+        setPreview(backendImageUrl);
+      } else {
+        // fallback to local preview
+        if (file) setPreview(URL.createObjectURL(file));
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: any) {
-      const msg = err?.response?.data?.detail || err.message || "Upload failed";
-      if (err?.response?.status === 409) {
-        toast.error("Duplicate listing detected");
+      // Defensive handling for server validation errors (422) and other errors.
+      // Ensure we DO NOT set `result` to a raw error object/array.
+      const status = err?.response?.status;
+      const payload = err?.response?.data;
+
+      if (status === 422 && payload) {
+        // Pydantic / FastAPI validation error commonly returns an array of objects like:
+        // [{loc: [...], msg: "...", type: "...", input: ...}, ...]
+        let userMsg = "Validation error";
+        try {
+          if (Array.isArray(payload)) {
+            // build readable message
+            userMsg = payload
+              .map((p: any) => {
+                const loc = Array.isArray(p.loc) ? p.loc.join(".") : String(p.loc || "");
+                return `${loc}: ${p.msg}`;
+              })
+              .join("; ");
+          } else if (payload.detail) {
+            userMsg = typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail);
+          } else {
+            userMsg = JSON.stringify(payload);
+          }
+        } catch {
+          userMsg = "Invalid input. Please check the form.";
+        }
+
+        toast.error(userMsg);
+        // make sure we do not set result to the raw error object
+        setResult(null);
       } else {
+        const msg = err?.response?.data?.detail || err?.message || "Upload failed";
         toast.error(msg);
       }
     } finally {
@@ -227,7 +470,6 @@ export default function NewListingPage() {
       lon = result.nearby_partners[0].lon;
     }
     if (isNaN(lat) || isNaN(lon)) return null;
-
     const delta = 0.02;
     const left = lon - delta,
       right = lon + delta,
@@ -239,10 +481,10 @@ export default function NewListingPage() {
     return { src, link, lat, lon };
   }, [form.lat, form.lon, result?.nearby_partners]);
 
-  // preview url cleanup
+  // preview cleanup
   useEffect(() => {
     return () => {
-      if (preview) URL.revokeObjectURL(preview);
+      if (preview && preview.startsWith("blob:")) URL.revokeObjectURL(preview);
     };
   }, [preview]);
 
@@ -373,31 +615,109 @@ export default function NewListingPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-10 grid lg:grid-cols-2 gap-10">
-        {/* LEFT: Form */}
+        {/* LEFT: Form */} 
         <section className="card card-hover p-8 space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">📦 New Listing</h2>
-            <span className="badge">Complete required fields</span>
+            <h2 className="text-lg font-semibold text-slate-900">📦 Quick Listing</h2>
+            <span className="badge">Fast — 1 min</span>
           </div>
           <div className="divider" />
 
-          <form onSubmit={submitListing} className="space-y-8">
+          <form onSubmit={submitListing} className="space-y-6">
             <div className="grid sm:grid-cols-2 gap-6">
-              <TextField label="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="mobile / laptop / tablet" required />
-              <TextField label="Brand" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} placeholder="Apple / Samsung / Dell" required />
-              <TextField label="Model" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder="iPhone 12 / Inspiron 15" required />
-              <TextField label="Age (months)" type="number" value={form.age_months} onChange={(e) => setForm({ ...form, age_months: e.target.value })} placeholder="24" required />
-              <TextField label="Original Price (₹)" type="number" value={form.original_price} onChange={(e) => setForm({ ...form, original_price: e.target.value })} placeholder="20000" required />
-              <TextField label="Defect Count" type="number" value={form.defect_count} onChange={(e) => setForm({ ...form, defect_count: e.target.value })} placeholder="0" />
-              <TextField label="Battery Health (%)" type="number" value={form.battery_health} onChange={(e) => setForm({ ...form, battery_health: e.target.value })} placeholder="80" />
-              <TextField label="Storage (GB)" type="number" value={form.storage_gb} onChange={(e) => setForm({ ...form, storage_gb: e.target.value })} placeholder="64" />
-              <TextField label="RAM (GB)" type="number" value={form.ram_gb} onChange={(e) => setForm({ ...form, ram_gb: e.target.value })} placeholder="4" />
-              <TextField label="Screen Issues (0/1)" type="number" value={form.screen_issues} onChange={(e) => setForm({ ...form, screen_issues: e.target.value })} placeholder="0" />
-              <TextField label="Body Issues (0/1)" type="number" value={form.body_issues} onChange={(e) => setForm({ ...form, body_issues: e.target.value })} placeholder="0" />
-              <TextField label="Accessories" value={form.accessories} onChange={(e) => setForm({ ...form, accessories: e.target.value })} placeholder="charger, box" />
-              <TextField label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="Bengaluru" />
-              <TextField label="Latitude" value={form.lat} onChange={(e) => setForm({ ...form, lat: e.target.value })} placeholder="(auto)" readOnly />
-              <TextField label="Longitude" value={form.lon} onChange={(e) => setForm({ ...form, lon: e.target.value })} placeholder="(auto)" readOnly />
+              {/* Brand dropdown */}
+              <div className="space-y-1">
+                <Label>Brand</Label>
+                <select
+                  className="input"
+                  value={form.brand}
+                  onChange={(e) => setForm({ ...form, brand: e.target.value })}
+                >
+                  <option>Apple</option>
+                  <option>Samsung</option>
+                  <option>OnePlus</option>
+                  <option>Realme</option>
+                  <option>Xiaomi</option>
+                  <option>Vivo</option>
+                  <option>Nokia</option>
+                  <option>Other</option>
+                </select>
+              </div>
+
+              <TextField
+                label="Model"
+                value={form.model}
+                onChange={(e) => setForm({ ...form, model: e.target.value })}
+                placeholder="iPhone 12 / Galaxy S21"
+                required
+              />
+
+              <TextField
+                label="Age (months)"
+                type="number"
+                value={form.age_months}
+                onChange={(e) => setForm({ ...form, age_months: e.target.value })}
+                placeholder="12"
+                required
+              />
+              <TextField
+                label="Original Price (₹)"
+                type="number"
+                value={form.original_price}
+                onChange={(e) => setForm({ ...form, original_price: e.target.value })}
+                placeholder="30000"
+                required
+              />
+
+              <TextField
+                label="Battery (%)"
+                type="number"
+                value={form.battery_health}
+                onChange={(e) => setForm({ ...form, battery_health: e.target.value })}
+                placeholder="80"
+              />
+
+              <div className="space-y-1">
+                <Label>Storage (GB)</Label>
+                <select
+                  className="input"
+                  value={form.storage_gb}
+                  onChange={(e) => setForm({ ...form, storage_gb: e.target.value })}
+                >
+                  <option>32</option>
+                  <option>64</option>
+                  <option>128</option>
+                  <option>256</option>
+                </select>
+              </div>
+
+              {/* Location fields: lat/lon + city + use location */}
+              <div className="space-y-1">
+                <Label>Latitude</Label>
+                <input className="input" value={form.lat} readOnly placeholder="(auto)" />
+              </div>
+              <div className="space-y-1">
+                <Label>Longitude</Label>
+                <input className="input" value={form.lon} readOnly placeholder="(auto)" />
+              </div>
+              <div className="space-y-1">
+                <Label>City</Label>
+                <input
+                  className="input"
+                  value={form.city}
+                  onChange={(e) => setForm({ ...form, city: e.target.value })}
+                  placeholder="City"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={getLocation}
+                  className="btn btn-ghost w-full"
+                >
+                  Use my location
+                </button>
+              </div>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-6">
@@ -412,6 +732,8 @@ export default function NewListingPage() {
                       const f = e.target.files?.[0] || null;
                       setFile(f);
                       setPreview(f ? URL.createObjectURL(f) : null);
+                      setResult(null);
+                      setCropUrl(null);
                     }}
                   />
                   <span className="text-sm text-slate-600">
@@ -419,20 +741,18 @@ export default function NewListingPage() {
                   </span>
                 </label>
                 {preview && (
-                  <img src={preview} alt="preview" className="mt-2 h-28 w-auto rounded-lg border" />
+                  <div className="mt-2 relative inline-block">
+                    <img ref={imgRef} src={preview} alt="preview" className="h-28 w-auto rounded-lg border" />
+                    <canvas ref={canvasRef} style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }} />
+                  </div>
                 )}
               </div>
 
               <div className="flex items-end gap-3">
-                <button type="button" onClick={getLocation} className="btn btn-ghost">
-                  Use my location
-                </button>
                 <button
+                  type="submit"
                   disabled={!canSubmit}
-                  className={cx(
-                    "btn btn-primary",
-                    (!canSubmit || isLoading) && "opacity-60 cursor-not-allowed"
-                  )}
+                  className={cx("btn btn-primary w-full", (!canSubmit || isLoading) && "opacity-60 cursor-not-allowed")}
                 >
                   {isLoading ? "Uploading..." : "Upload & Predict"}
                 </button>
@@ -450,62 +770,146 @@ export default function NewListingPage() {
         {/* RIGHT: Results + Map + Partners */}
         <section className="space-y-6">
           <div className="card card-hover p-8 space-y-4">
-            <h2 className="text-lg font-semibold text-slate-900">📈 Prediction</h2>
-            {!result ? (
+            <h2 className="text-lg font-semibold text-slate-900">📈 Prediction (explanation)</h2>
+
+            {/* method/model/inference info (kept internal) */}
+            {isValidResult(result) && (
+              <div className="mt-2 text-xs text-slate-500">
+                <span>Method: <strong>Hidden</strong></span>
+                {" • "}
+                <span>Detections: <strong>{Array.isArray(result.detections) ? result.detections.length : 0}</strong></span>
+              </div>
+            )}
+
+            {!isValidResult(result) ? (
               <p className="text-sm text-slate-600">
-                Submit a listing to see condition, price, RUL, repair/recycle, CO₂ saved, and nearby partners.
+                Submit a listing to see condition, price, RUL and nearby partners.
               </p>
             ) : (
-              <div className="grid sm:grid-cols-2 gap-6">
+              <>
                 <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="text-xs text-slate-500">Image Condition</div>
-                  <div className="mt-1 text-lg font-semibold">{result.image_condition?.label}</div>
-                  <div className="text-xs text-slate-500">
-                    confidence: {result.image_condition?.confidence}
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="text-xs text-slate-500">Predicted condition</div>
+                      <div className="mt-1 text-lg font-semibold">{(result.image_condition && result.image_condition.label) || "Unknown"}</div>
+                      <div className="text-xs text-slate-500">Confidence: {(result.image_condition && typeof result.image_condition.confidence === "number" ? result.image_condition.confidence.toFixed(2) : "—")}</div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-xs text-slate-500">Estimated impact</div>
+                      <div className="text-xl font-bold text-rose-600">
+                        {(() => {
+                          const top = Array.isArray(result.detections) && result.detections.length ? result.detections[0] : null;
+                          const info = top && top.label ? (labelInfo[top.label] ?? labelInfo.default) : labelInfo.default;
+                          return info.short;
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* friendly explanation */}
+                  <div className="mt-4 text-sm text-slate-700">
+                    {(() => {
+                      const top = Array.isArray(result.detections) && result.detections.length ? result.detections[0] : null;
+                      if (top && top.label) {
+                        const info = labelInfo[top.label] ?? labelInfo.default;
+                        return `${info.short}: ${info.explanation}`;
+                      }
+                      if (result.predictions && (result.predictions.price_suggest || result.predictions.rul_months)) {
+                        return `Price and RUL estimated from device specs and image.`;
+                      }
+                      return `No specific defect was identified by the model.`;
+                    })()}
+                  </div>
+
+                  {/* detections list with bars */}
+                  {Array.isArray(result.detections) && result.detections.length ? (
+                    <div className="mt-3 text-xs space-y-2">
+                      <div className="text-slate-600 mb-2">Detected issues</div>
+                      {result.detections.map((d: any, i: number) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <div className="w-28 text-xs">{d.label || d.name || "issue"}</div>
+                          <div className="flex-1 bg-slate-100 rounded h-3 overflow-hidden">
+                            <div style={{width: `${Math.round(((d.confidence ?? d.score ?? 0) as number) * 100)}%`}} className="h-3 bg-green-500"></div>
+                          </div>
+                          <div className="text-xs w-10 text-right">{Math.round(((d.confidence ?? d.score ?? 0) as number) * 100)}%</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* crop + short explanation */}
+                {cropUrl && Array.isArray(result.detections) && result.detections.length ? (
+                  <div className="mt-4 flex gap-4 items-start">
+                    <div className="w-28 h-28 flex-shrink-0 rounded overflow-hidden border">
+                      <img src={cropUrl} alt="defect crop" className="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium">
+                        {(() => {
+                          const top = [...result.detections].sort(
+                            (a: any, b: any) => (b.confidence ?? b.score ?? 0) - (a.confidence ?? a.score ?? 0)
+                          )[0];
+                          return (labelInfo[top?.label]?.short || top?.label || "Defect");
+                        })()}
+                      </div>
+                      <div className="text-xs text-slate-600 mt-1">
+                        {(() => {
+                          const top = [...result.detections].sort(
+                            (a: any, b: any) => (b.confidence ?? b.score ?? 0) - (a.confidence ?? a.score ?? 0)
+                          )[0];
+                          const info = labelInfo[top?.label] ?? labelInfo.default;
+                          return `${info.explanation} Confidence ${(top.confidence ?? top.score ?? 0).toFixed(2)}`;
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Price / RUL / Decision */}
+                <div className="grid sm:grid-cols-3 gap-4 mt-4">
+                  <div className="rounded-xl border p-4 bg-white">
+                    <div className="text-xs text-slate-500">Suggested price</div>
+                    <div className="text-lg font-semibold mt-1">₹{(result?.predictions?.price_suggest ?? result?.predictions?.predicted_price) ?? "—"}</div>
+                    <div className="text-xs text-slate-400 mt-1">Original: ₹{form.original_price || "—"}</div>
+                  </div>
+
+                  <div className="rounded-xl border p-4 bg-white">
+                    <div className="text-xs text-slate-500">Remaining useful life</div>
+                    <div className="text-lg font-semibold mt-1">{result?.predictions?.rul_months ?? "—"} months</div>
+                  </div>
+
+                  <div className="rounded-xl border p-4 bg-white">
+                    <div className="text-xs text-slate-500">Recommendation</div>
+                    <div className="text-lg font-semibold mt-1">{result?.predictions?.decision ?? "—"}</div>
+                    <div className="text-xs text-slate-400 mt-2">CO₂ saved: {result?.predictions?.co2_saved_kg ?? "—"} kg</div>
                   </div>
                 </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="text-xs text-slate-500">RUL</div>
-                  <div className="mt-1 text-lg font-semibold">
-                    {result.predictions?.rul_months} months
-                  </div>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="text-xs text-slate-500">Suggested Price</div>
-                  <div className="mt-1 text-lg font-semibold">
-                    ₹{result.predictions?.price_suggest}
-                  </div>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="text-xs text-slate-500">Decision</div>
-                  <div className="mt-1 text-lg font-semibold">
-                    {result.predictions?.decision}
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    CO₂ saved: {result.predictions?.co2_saved_kg} kg
-                  </div>
-                </div>
-              </div>
+
+              </>
             )}
           </div>
 
-          {/* Location badge */}
-          {(form.lat || form.lon) && (
-            <div className="rounded-xl border bg-white p-4 shadow-sm">
-              <div className="text-xs text-slate-500">Detected Location</div>
-              <div className="mt-1 text-sm font-medium">
-                {form.lat || "—"}, {form.lon || "—"}
+          {/* small image + overlay box area */}
+          {preview && (
+            <div className="rounded-xl border bg-white p-4">
+              <div className="text-xs text-slate-500 mb-2">Uploaded image (detections overlay)</div>
+              <div className="relative w-full">
+                <img ref={imgRef} src={preview} alt="uploaded" className="max-h-[360px] w-auto max-w-full block mx-auto" />
+                <canvas ref={canvasRef} style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }} />
               </div>
             </div>
           )}
 
-          {/* Map (smaller height) */}
+          {/* Map (compact) */}
           {map && (
             <div className="rounded-2xl overflow-hidden ring-1 ring-black/5 shadow-sm">
-              <iframe title="map" src={map.src} className="w-full h-[220px]" />
+              <iframe title="map" src={map.src} className="w-full h-[180px]" />
               <a
                 href={map.link}
                 target="_blank"
+                rel="noreferrer"
                 className="block text-center text-sm py-2 text-sky-700"
               >
                 Open in OpenStreetMap
@@ -514,11 +918,11 @@ export default function NewListingPage() {
           )}
 
           {/* Nearby partners */}
-          {result?.nearby_partners?.length ? (
+          {Array.isArray(result?.nearby_partners) && result.nearby_partners.length ? (
             <div className="card card-hover p-6">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-semibold text-slate-900">
-                  🏪 Nearby Repair/Recycling Partners
+                  🏪 Nearby Repair / Recycling
                 </h3>
                 <span className="text-xs text-slate-500">
                   {result.nearby_partners.length} found
@@ -533,15 +937,16 @@ export default function NewListingPage() {
                     <div>
                       <div className="font-medium">{p.name}</div>
                       <div className="text-slate-500 text-xs">
-                        {p.lat.toFixed(4)}, {p.lon.toFixed(4)}
+                        {Number(p.lat).toFixed(4)}, {Number(p.lon).toFixed(4)}
                       </div>
                     </div>
                     <a
                       className="text-sky-700 text-xs underline"
                       href={`https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=16/${p.lat}/${p.lon}`}
                       target="_blank"
+                      rel="noreferrer"
                     >
-                      View map
+                      View
                     </a>
                   </li>
                 ))}
