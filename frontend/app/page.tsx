@@ -5,8 +5,15 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import {
   ResponsiveContainer,
-  AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip,
-  PieChart, Pie, Cell,
+  AreaChart,
+  Area,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 
 type Listing = {
@@ -17,6 +24,7 @@ type Listing = {
   model?: string;
   city?: string;
   image?: string;
+  status?: string; // created / shared_with_partner / in_progress / completed / cancelled
   predictions?: {
     price_suggest?: number;
     rul_months?: number;
@@ -36,7 +44,11 @@ function StatCard({
   title,
   value,
   foot,
-}: { title: string; value: string | number; foot?: string }) {
+}: {
+  title: string;
+  value: string | number;
+  foot?: string;
+}) {
   return (
     <div className="rounded-2xl border bg-white p-4 shadow-sm hover:shadow transition">
       <div className="text-xs text-slate-500">{title}</div>
@@ -149,7 +161,17 @@ export default function Dashboard() {
       { name: "Poor", value: poor },
     ];
 
-    return { count, avgPrice, avgRul, co2Total: Math.round(co2), goodPct, fairPct, poorPct, dailySeries, pieSeries };
+    return {
+      count,
+      avgPrice,
+      avgRul,
+      co2Total: Math.round(co2),
+      goodPct,
+      fairPct,
+      poorPct,
+      dailySeries,
+      pieSeries,
+    };
   }, [listings]);
 
   // ---------------------- LOGIN SCREEN ----------------------
@@ -187,9 +209,7 @@ export default function Dashboard() {
             </h1>
           </div>
           <div className="flex items-center gap-3">
-            <span className="hidden sm:inline text-sm text-slate-700">
-              Hi, {auth.name}
-            </span>
+            <span className="hidden sm:inline text-sm text-slate-700">Hi, {auth.name}</span>
             <Link
               href="/new-listing"
               className="rounded-xl border px-3 py-2 bg-white hover:bg-slate-100 text-sm"
@@ -269,13 +289,14 @@ export default function Dashboard() {
                     <th className="py-2 pr-4">Price (₹)</th>
                     <th className="py-2 pr-4">RUL</th>
                     <th className="py-2 pr-4">Decision</th>
+                    <th className="py-2 pr-4">Status</th>
                     <th className="py-2 pr-4">Created</th>
                     <th className="py-2 pr-4">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {listings.map((l) => (
-                    <tr key={l.id} className="border-b hover:bg-slate-50">
+                    <tr key={l.id} className="border-b hover:bg-slate-50 align-top">
                       <td className="py-2 pr-4">
                         {l.image ? (
                           <img
@@ -287,14 +308,32 @@ export default function Dashboard() {
                           "—"
                         )}
                       </td>
-                      <td className="py-2 pr-4">{[l.brand, l.model].filter(Boolean).join(" ")}</td>
-                      <td className="py-2 pr-4">{l.category}</td>
-                      <td className="py-2 pr-4">{l.image_condition?.label || "—"}</td>
-                      <td className="py-2 pr-4">{l.predictions?.price_suggest ?? "—"}</td>
-                      <td className="py-2 pr-4">{l.predictions?.rul_months ?? "—"} mo</td>
-                      <td className="py-2 pr-4">{l.predictions?.decision ?? "—"}</td>
                       <td className="py-2 pr-4">
-                        {l.created_at ? new Date(l.created_at).toLocaleDateString() : "—"}
+                        {[l.brand, l.model].filter(Boolean).join(" ")}
+                      </td>
+                      <td className="py-2 pr-4">{l.category}</td>
+
+                      {/* ✅ FIXED: use image_condition.label so it shows Good / Fair / Poor */}
+                      <td className="py-2 pr-4">
+                        {l.image_condition?.label ?? "—"}
+                      </td>
+
+                      <td className="py-2 pr-4">
+                        {l.predictions?.price_suggest ?? "—"}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {l.predictions?.rul_months ?? "—"} mo
+                      </td>
+                      <td className="py-2 pr-4">
+                        {l.predictions?.decision ?? "—"}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {l.status ?? "created"}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {l.created_at
+                          ? new Date(l.created_at).toLocaleDateString()
+                          : "—"}
                       </td>
                       <td className="py-2 pr-4">
                         <button
@@ -310,8 +349,7 @@ export default function Dashboard() {
                               setListings((prev) => prev.filter((x) => x.id !== l.id));
                               toast.success("Listing deleted");
                             } catch (e: any) {
-                              const msg =
-                                e?.response?.data?.detail || "Delete failed";
+                              const msg = e?.response?.data?.detail || "Delete failed";
                               toast.error(msg);
                             }
                           }}
