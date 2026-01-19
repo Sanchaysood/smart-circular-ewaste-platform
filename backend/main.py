@@ -8,6 +8,18 @@ import pickle
 import uuid
 import math
 import time
+
+# Optional: load environment variables from a local .env file (dev convenience).
+# This keeps secrets out of source control (repo .gitignore already ignores .env).
+try:
+    from dotenv import load_dotenv
+
+    # Load from backend/.env (same directory as this file)
+    load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+except Exception:
+    # If python-dotenv isn't installed, continue using system env vars.
+    pass
+
 import joblib
 import pandas as pd
 from PIL import Image
@@ -165,6 +177,52 @@ class Listing(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class GroundTruthFeedback(Base):
+    """
+    Store ground-truth feedback for validating AI predictions.
+    Partners or users can submit actual outcomes (real price, condition, decision).
+    """
+    __tablename__ = "ground_truth_feedback"
+    id = Column(Integer, primary_key=True, index=True)
+    listing_id = Column(Integer, nullable=False, index=True)
+    actual_price = Column(Integer, nullable=True)
+    actual_condition = Column(String(20), nullable=True)
+    actual_decision = Column(String(20), nullable=True)
+    feedback_notes = Column(Text, nullable=True)
+    submitted_by_user_id = Column(Integer, nullable=True)
+    feedback_date = Column(DateTime, default=datetime.utcnow)
+
+
+class Message(Base):
+    """
+    Store in-app messages between users and partners for a specific listing.
+    One conversation thread per listing.
+    """
+    __tablename__ = "messages"
+    id = Column(Integer, primary_key=True, index=True)
+    listing_id = Column(Integer, nullable=False, index=True)
+    sender_user_id = Column(Integer, nullable=False)  # who sent this message
+    sender_role = Column(String(20), nullable=False)  # "customer", "partner", "admin"
+    message_text = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class Offer(Base):
+    """
+    Store offers made by partners on listings.
+    Each listing can have one active offer at a time.
+    """
+    __tablename__ = "offers"
+    id = Column(Integer, primary_key=True, index=True)
+    listing_id = Column(Integer, nullable=False, index=True, unique=True)  # one offer per listing
+    partner_user_id = Column(Integer, nullable=False)  # partner who made the offer
+    offer_price = Column(Integer, nullable=False)
+    status = Column(String(20), nullable=False, default="pending")  # pending, accepted, rejected
+    message = Column(Text, nullable=True)  # optional note from partner
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Partner(Base):
     __tablename__ = "partners"
     id = Column(Integer, primary_key=True, index=True)
@@ -243,12 +301,23 @@ def init_db():
                 db.commit()
                 print(f"[startup] Admin user created: {admin_email_l}")
             else:
-                # ensure role set to admin
+                # ensure role set to admin AND ensure password matches ADMIN_PASSWORD.
+                # This avoids confusion when the email already exists in the DB with a different password.
+                changed = False
                 if getattr(existing, "role", None) != "admin":
                     existing.role = "admin"
+                    changed = True
+                try:
+                    new_hash = sha256(admin_password)
+                    if getattr(existing, "password_hash", None) != new_hash:
+                        existing.password_hash = new_hash
+                        changed = True
+                except Exception:
+                    pass
+                if changed:
                     db.add(existing)
                     db.commit()
-                    print(f"[startup] Existing user promoted to admin: {admin_email_l}")
+                    print(f"[startup] Existing user updated as admin: {admin_email_l}")
             db.close()
     except Exception:
         pass
@@ -2160,3 +2229,405 @@ def partner_leads_simple(user: User = Depends(require_user), db: Session = Depen
     )
     items = [_serialize_listing_for_lead(r) for r in rows]
     return {"items": items}
+
+# ---------------------------------------------------------------------
+# MESSAGING SYSTEM - Simple in-app chat per listing
+# ---------------------------------------------------------------------
+
+@app.post("/listings/{listing_id}/messages")
+def send_message(
+    listing_id: int,
+    body: dict,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Send a message in a listing conversation.
+    Body: {"message": "text"}
+    """
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    message_text = body.get("message", "").strip()
+    if not message_text:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+    
+    # Create message
+    msg = Message(
+        listing_id=listing_id,
+        sender_user_id=user.id,
+        sender_role=user.role,
+        message_text=message_text
+    )
+    db.add(msg)
+    db.commit()
+    db.refresh(msg)
+    
+    return {
+        "id": msg.id,
+        "listing_id": msg.listing_id,
+        "sender_user_id": msg.sender_user_id,
+        "sender_role": msg.sender_role,
+        "sender_name": user.name,
+        "message": msg.message_text,
+        "created_at": msg.created_at.isoformat() if msg.created_at else None
+    }
+
+
+@app.get("/listings/{listing_id}/messages")
+def get_messages(
+    listing_id: int,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all messages for a listing conversation.
+    Returns array of messages with sender info.
+    """
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    # Get all messages for this listing
+    messages = (
+        db.query(Message)
+        .filter(Message.listing_id == listing_id)
+        .order_by(Message.created_at.asc())
+        .all()
+    )
+    
+    # Join with user info
+    result = []
+    for msg in messages:
+        sender = db.query(User).filter(User.id == msg.sender_user_id).first()
+        result.append({
+            "id": msg.id,
+            "listing_id": msg.listing_id,
+            "sender_user_id": msg.sender_user_id,
+            "sender_role": msg.sender_role,
+            "sender_name": sender.name if sender else "Unknown",
+            "sender_email": sender.email if sender else None,
+            "message": msg.message_text,
+            "created_at": msg.created_at.isoformat() if msg.created_at else None
+        })
+    
+    return {"messages": result}
+
+
+# ---------------------------------------------------------------------
+# OFFER & ACCEPTANCE SYSTEM
+# ---------------------------------------------------------------------
+
+@app.post("/listings/{listing_id}/offer")
+def create_offer(
+    listing_id: int,
+    body: dict,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Partner creates or updates an offer for a listing.
+    Body: {"offer_price": 5000, "message": "optional note"}
+    """
+    if user.role != "partner":
+        raise HTTPException(status_code=403, detail="Only partners can make offers")
+    
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    offer_price = body.get("offer_price")
+    if not offer_price or offer_price <= 0:
+        raise HTTPException(status_code=400, detail="Invalid offer price")
+    
+    # Check if offer already exists for this listing
+    existing_offer = db.query(Offer).filter(Offer.listing_id == listing_id).first()
+    
+    if existing_offer:
+        # Update existing offer
+        existing_offer.partner_user_id = user.id
+        existing_offer.offer_price = offer_price
+        existing_offer.message = body.get("message", "")
+        existing_offer.status = "pending"
+        existing_offer.updated_at = datetime.utcnow()
+        db.commit()
+        db.refresh(existing_offer)
+        offer = existing_offer
+    else:
+        # Create new offer
+        offer = Offer(
+            listing_id=listing_id,
+            partner_user_id=user.id,
+            offer_price=offer_price,
+            message=body.get("message", ""),
+            status="pending"
+        )
+        db.add(offer)
+        db.commit()
+        db.refresh(offer)
+    
+    # Update listing status
+    if listing.status == "created":
+        listing.status = "offer_sent"
+        db.commit()
+    
+    return {
+        "id": offer.id,
+        "listing_id": offer.listing_id,
+        "partner_user_id": offer.partner_user_id,
+        "offer_price": offer.offer_price,
+        "message": offer.message,
+        "status": offer.status,
+        "created_at": offer.created_at.isoformat() if offer.created_at else None
+    }
+
+
+@app.get("/listings/{listing_id}/offer")
+def get_offer(
+    listing_id: int,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get the current offer for a listing (if any).
+    """
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    offer = db.query(Offer).filter(Offer.listing_id == listing_id).first()
+    if not offer:
+        return {"offer": None}
+    
+    # Get partner info
+    partner_user = db.query(User).filter(User.id == offer.partner_user_id).first()
+    partner_info = db.query(Partner).filter(Partner.user_id == offer.partner_user_id).first()
+    
+    return {
+        "offer": {
+            "id": offer.id,
+            "listing_id": offer.listing_id,
+            "partner_user_id": offer.partner_user_id,
+            "partner_name": partner_info.org_name if partner_info else partner_user.name if partner_user else "Unknown",
+            "partner_email": partner_user.email if partner_user else None,
+            "partner_phone": partner_info.contact_phone if partner_info else None,
+            "partner_city": partner_info.city if partner_info else None,
+            "partner_kyc_status": partner_info.kyc_status if partner_info else None,
+            "offer_price": offer.offer_price,
+            "message": offer.message,
+            "status": offer.status,
+            "created_at": offer.created_at.isoformat() if offer.created_at else None
+        }
+    }
+
+
+@app.post("/listings/{listing_id}/offer/accept")
+def accept_offer(
+    listing_id: int,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """
+    User accepts the offer on their listing.
+    """
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    # Verify user owns this listing
+    if listing.user_id != user.id:
+        raise HTTPException(status_code=403, detail="You don't own this listing")
+    
+    offer = db.query(Offer).filter(Offer.listing_id == listing_id).first()
+    if not offer:
+        raise HTTPException(status_code=404, detail="No offer found for this listing")
+    
+    if offer.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Offer already {offer.status}")
+    
+    # Accept the offer
+    offer.status = "accepted"
+    offer.updated_at = datetime.utcnow()
+    
+    # Update listing
+    listing.status = "accepted"
+    listing.chosen_partner_id = offer.partner_user_id
+    listing.final_price = offer.offer_price
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "Offer accepted successfully",
+        "listing_status": listing.status,
+        "final_price": listing.final_price
+    }
+
+
+@app.post("/listings/{listing_id}/offer/reject")
+def reject_offer(
+    listing_id: int,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """
+    User rejects the offer on their listing.
+    """
+    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    
+    # Verify user owns this listing
+    if listing.user_id != user.id:
+        raise HTTPException(status_code=403, detail="You don't own this listing")
+    
+    offer = db.query(Offer).filter(Offer.listing_id == listing_id).first()
+    if not offer:
+        raise HTTPException(status_code=404, detail="No offer found for this listing")
+    
+    if offer.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Offer already {offer.status}")
+    
+    # Reject the offer
+    offer.status = "rejected"
+    offer.updated_at = datetime.utcnow()
+    
+    # Reset listing status
+    listing.status = "created"
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "Offer rejected",
+        "listing_status": listing.status
+    }
+
+
+# ---------------------------------------------------------------------
+# USER DASHBOARD APIs
+# ---------------------------------------------------------------------
+
+@app.get("/users/me/listings")
+def get_my_listings(
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all listings created by the current user.
+    """
+    listings = (
+        db.query(Listing)
+        .filter(Listing.user_id == user.id)
+        .order_by(Listing.created_at.desc())
+        .all()
+    )
+    
+    result = []
+    for listing in listings:
+        try:
+            payload = json.loads(listing.payload)
+        except:
+            payload = {}
+        
+        try:
+            result_json = json.loads(listing.result_json) if listing.result_json else {}
+        except:
+            result_json = {}
+        
+        # Get offer if exists
+        offer = db.query(Offer).filter(Offer.listing_id == listing.id).first()
+        offer_data = None
+        if offer:
+            partner_user = db.query(User).filter(User.id == offer.partner_user_id).first()
+            partner_info = db.query(Partner).filter(Partner.user_id == offer.partner_user_id).first()
+            offer_data = {
+                "id": offer.id,
+                "partner_name": partner_info.org_name if partner_info else (partner_user.name if partner_user else "Unknown"),
+                "partner_city": partner_info.city if partner_info else None,
+                "partner_phone": partner_info.contact_phone if partner_info else None,
+                "partner_kyc_status": partner_info.kyc_status if partner_info else None,
+                "offer_price": offer.offer_price,
+                "message": offer.message,
+                "status": offer.status
+            }
+        
+        # Count unread messages (simplified: just count total messages)
+        message_count = db.query(Message).filter(Message.listing_id == listing.id).count()
+        
+        # Extract predictions properly
+        predictions = result_json.get("predictions", {})
+        image_condition = result_json.get("image_condition", {})
+        
+        result.append({
+            "id": listing.id,
+            "brand": payload.get("brand"),
+            "model": payload.get("model"),
+            "category": payload.get("category"),
+            "status": listing.status,
+            "intent": listing.intent,
+            "image": os.path.basename(listing.image_path) if listing.image_path else None,
+            "predicted_price": predictions.get("price_suggest"),
+            "predicted_decision": predictions.get("decision"),
+            "predicted_rul_months": predictions.get("rul_months"),
+            "co2_saved_kg": predictions.get("co2_saved_kg"),
+            "image_condition": image_condition,
+            "final_price": listing.final_price,
+            "offer": offer_data,
+            "message_count": message_count,
+            "created_at": listing.created_at.isoformat() if listing.created_at else None
+        })
+    
+    return {"listings": result}
+
+
+@app.get("/users/me/dashboard")
+def get_dashboard(
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Get comprehensive dashboard data for user.
+    Returns: listings count, total CO2 impact, pending offers, etc.
+    """
+    listings = db.query(Listing).filter(Listing.user_id == user.id).all()
+    
+    total_co2 = 0
+    pending_offers_count = 0
+    accepted_count = 0
+    completed_count = 0
+    
+    for listing in listings:
+        try:
+            result_json = json.loads(listing.result_json) if listing.result_json else {}
+            # CO2 is in predictions sub-object
+            co2 = result_json.get("predictions", {}).get("co2_saved_kg", 0)
+            if co2:
+                total_co2 += co2
+        except:
+            pass
+        
+        if listing.status == "offer_sent":
+            pending_offers_count += 1
+        elif listing.status == "accepted":
+            accepted_count += 1
+        elif listing.status == "completed":
+            completed_count += 1
+    
+    return {
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "role": user.role
+        },
+        "stats": {
+            "total_listings": len(listings),
+            "pending_offers": pending_offers_count,
+            "accepted_deals": accepted_count,
+            "completed_deals": completed_count,
+            "total_co2_saved_kg": round(total_co2, 2),
+            "environmental_impact": "High" if total_co2 > 50 else "Moderate" if total_co2 > 20 else "Growing"
+        }
+    }

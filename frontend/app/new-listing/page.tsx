@@ -90,9 +90,19 @@ const labelInfo: Record<
 export default function NewListingPage() {
   const [auth, setAuth] = useState<AuthState>({ token: null, name: null });
   const [isLoading, setIsLoading] = useState(false);
-  const [tab, setTab] = useState<"login" | "register">("login");
+  
+  // Check if user is coming from partner portal
+  const searchParams = useSearchParams();
+  const isPartnerFlow = searchParams?.get("partner") === "true";
+  const [tab, setTab] = useState<"login" | "register">(isPartnerFlow ? "register" : "login");
 
-  const [reg, setReg] = useState({ name: "", email: "", password: "", confirmPassword: "", isPartner: false });
+  const [reg, setReg] = useState({ 
+    name: "", 
+    email: "", 
+    password: "", 
+    confirmPassword: "", 
+    isPartner: isPartnerFlow // Auto-check partner checkbox if coming from partner portal
+  });
   const [login, setLogin] = useState({ email: "", password: "" });
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
@@ -123,11 +133,11 @@ export default function NewListingPage() {
   const imgRef = useRef<HTMLImageElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const cropCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // ---------- compute backHref from ?next=... ----------
-  const searchParams = useSearchParams();
   const nextParamRaw = searchParams?.get("next") ?? "";
-  let backHref = "/";
+  let backHref = "/"; // Go to main dashboard
   if (nextParamRaw) {
     try {
       const decoded = decodeURIComponent(nextParamRaw);
@@ -642,39 +652,48 @@ export default function NewListingPage() {
   if (!auth.token) {
     return (
       <div className="min-h-screen">
-        <nav className="navbar">
-          <div className="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between">
+        <header className="sticky top-0 z-40 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
+          <div className="container-eco py-4 flex items-center justify-center">
             <div className="flex items-center gap-3">
               <img
                 src="/logo.png"
                 alt="E-Waste Logo"
-                className="w-9 h-9 rounded-md"
+                className="w-10 h-10 rounded-xl object-contain"
               />
-              <h1 className="text-2xl font-bold tracking-tight">
-                <span className="brand-text">
-                  Smart Circular E-Waste Platform
-                </span>
+              <h1 className="text-lg md:text-xl font-bold text-gradient-eco">
+                Smart Circular E-Waste Platform
               </h1>
             </div>
-            {/* Back to app uses computed backHref */}
-            <Link
-              href={backHref}
-              className="rounded-xl border px-3 py-2 bg-white hover:bg-slate-100 text-sm"
-            >
-              ← Back to app
-            </Link>
           </div>
-        </nav>
+        </header>
 
-        <main className="mx-auto max-w-4xl px-6 py-10">
-          <div className="card card-hover p-8 space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="flex gap-2">
+        <main className="container-eco py-10">
+          <div className="max-w-2xl mx-auto">
+            <div className="eco-card space-y-6">
+              <div className="text-center mb-4">
+                {isPartnerFlow && (
+                  <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-[rgb(var(--eco-primary))]/10 to-[rgb(var(--eco-secondary))]/10 flex items-center justify-center">
+                    <span className="text-3xl">🏪</span>
+                  </div>
+                )}
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">
+                  {isPartnerFlow ? "Partner Registration" : "Welcome Back"}
+                </h2>
+                <p className="text-sm text-slate-600">
+                  {isPartnerFlow 
+                    ? "Create your partner account to receive repair & recycling leads" 
+                    : "Sign in to your account or create a new one"}
+                </p>
+              </div>
+              
+              <div className="flex items-center justify-center gap-3 mb-6">
                 <button
                   onClick={() => setTab("login")}
                   className={cx(
-                    "tab",
-                    tab === "login" ? "tab-active" : "tab-passive",
+                    "px-6 py-2.5 rounded-xl font-medium text-sm transition-all",
+                    tab === "login" 
+                      ? "bg-gradient-to-r from-[rgb(var(--eco-primary))] to-[rgb(var(--eco-secondary))] text-white shadow-md"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   )}
                 >
                   Login
@@ -682,14 +701,17 @@ export default function NewListingPage() {
                 <button
                   onClick={() => setTab("register")}
                   className={cx(
-                    "tab",
-                    tab === "register" ? "tab-active" : "tab-passive",
+                    "px-6 py-2.5 rounded-xl font-medium text-sm transition-all",
+                    tab === "register" 
+                      ? "bg-gradient-to-r from-[rgb(var(--eco-primary))] to-[rgb(var(--eco-secondary))] text-white shadow-md"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   )}
                 >
                   Register
                 </button>
               </div>
-            </div>
+
+              <div className="eco-divider" />
 
             {tab === "login" ? (
               <div className="grid md:grid-cols-2 gap-6">
@@ -712,32 +734,30 @@ export default function NewListingPage() {
                   placeholder="••••••••"
                   required
                 />
-                <div className="md:col-span-2 flex items-center justify-between">
-                  <div className="flex gap-2 text-xs text-slate-500">
+                <div className="md:col-span-2 space-y-4">
+                  <button
+                    onClick={doLogin}
+                    className="eco-btn-primary w-full"
+                  >
+                    Sign In →
+                  </button>
+                  
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-slate-600">
                     <button
                       type="button"
                       onClick={() => setShowForgot(true)}
-                      className="underline text-sky-600 hover:font-semibold"
+                      className="text-[rgb(var(--eco-primary))] hover:text-[rgb(var(--eco-secondary))] font-medium transition"
                     >
                       Forgot password?
                     </button>
-                    <span>•</span>
-                    <span>
-                      Are you a repair / recycler partner?{" "}
-                      <Link
-                        className="underline text-sky-600 hover:font-semibold"
-                        href={`/partner?next=${encodeURIComponent("/new-listing")}`}
-                      >
-                        Go to Partner Portal
-                      </Link>
-                    </span>
+                    <span className="hidden sm:inline">•</span>
+                    <Link
+                      className="text-[rgb(var(--eco-primary))] hover:text-[rgb(var(--eco-secondary))] font-medium transition"
+                      href={`/partner?next=${encodeURIComponent("/new-listing")}`}
+                    >
+                      Partner Portal →
+                    </Link>
                   </div>
-                  <button
-                    onClick={doLogin}
-                    className="btn btn-primary w-full md:w-auto"
-                  >
-                    Login
-                  </button>
                 </div>
               </div>
             ) : (
@@ -781,7 +801,7 @@ export default function NewListingPage() {
                   required
                 />
                 {/* Partner Checkbox */}
-                <div className="md:col-span-3 rounded-lg bg-slate-50 border border-slate-200 p-4">
+                <div className="md:col-span-3 rounded-xl bg-gradient-to-br from-[rgb(var(--eco-primary))]/5 to-[rgb(var(--eco-secondary))]/5 border-2 border-[rgb(var(--eco-primary))]/20 p-4">
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
                       type="checkbox"
@@ -789,80 +809,94 @@ export default function NewListingPage() {
                       onChange={(e) =>
                         setReg({ ...reg, isPartner: e.target.checked })
                       }
-                      className="w-4 h-4"
+                      className="w-5 h-5 rounded accent-[rgb(var(--eco-primary))] cursor-pointer"
                     />
-                    <span className="text-sm text-slate-700 font-medium">
-                      Register as a Partner
+                    <span className="text-sm text-slate-700 font-semibold">
+                      🏪 Register as a Partner
                     </span>
                   </label>
-                  <p className="text-xs text-slate-500 ml-7 mt-2">
+                  <p className="text-xs text-slate-600 ml-8 mt-2">
                     Check this if you&apos;re a repair or recycling business. Your profile will be reviewed by our admin team.
                   </p>
                 </div>
                 <div className="md:col-span-3">
                   <button
                     onClick={doRegister}
-                    className="btn btn-primary w-full md:w-auto"
+                    className="eco-btn-primary w-full"
                   >
-                    Create account
+                    Create Account →
                   </button>
                 </div>
               </div>
             )}
+            </div>
           </div>
 
           {/* Forgot Password Modal */}
           {showForgot && (
-            <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 z-50">
-              <div className="card p-6 max-w-sm w-full">
-                <h3 className="text-lg font-bold mb-4">Reset Password</h3>
-                <div className="space-y-4">
-                  {/* Simple no-email flow: enter email + new password and submit. This calls a guarded backend endpoint (ALLOW_INSECURE_RESET=true). */}
-                  <>
-                    <div className="text-sm text-slate-600">Enter your account email and choose a new password. (No email will be sent.)</div>
-                    <div className="space-y-3 mt-2">
-                      <TextField label="Email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder="your@email.com" />
-                      <TextField label="New Password" type="password" value={resetNewPassword} onChange={(e) => setResetNewPassword(e.target.value)} placeholder="••••••••" />
-                      <TextField label="Confirm Password" type="password" value={resetConfirmPassword} onChange={(e) => setResetConfirmPassword(e.target.value)} placeholder="••••••••" />
-                    </div>
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={() => {
-                          setShowForgot(false);
-                          setForgotEmail("");
-                          setResetNewPassword("");
-                          setResetConfirmPassword("");
-                        }}
-                        className="flex-1 px-4 py-2 border rounded text-slate-600 hover:bg-slate-50"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (!forgotEmail) { toast.error("Enter your email"); return; }
-                          if (resetNewPassword !== resetConfirmPassword) { toast.error("Passwords do not match"); return; }
-                          if (resetNewPassword.length < 6) { toast.error("Password must be at least 6 characters"); return; }
-                          try {
-                            const form = new URLSearchParams();
-                            form.append("email", forgotEmail);
-                            form.append("new_password", resetNewPassword);
-                            const res = await axios.post(`${API}/auth/reset-password-direct`, form, { headers: { "Content-Type": "application/x-www-form-urlencoded" } });
-                            toast.success(res.data?.message || "Password reset")
-                            setShowForgot(false);
-                            setForgotEmail("");
-                            setResetNewPassword("");
-                            setResetConfirmPassword("");
-                          } catch (err: any) {
-                            const msg = err?.response?.data?.detail || err?.message || "Reset failed";
-                            toast.error(msg);
-                          }
-                        }}
-                        className="flex-1 btn btn-primary"
-                      >
-                        Reset Password
-                      </button>
-                    </div>
-                  </>
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="eco-card max-w-md w-full space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-slate-900">Reset Password</h3>
+                  <button
+                    onClick={() => {
+                      setShowForgot(false);
+                      setForgotEmail("");
+                      setResetNewPassword("");
+                      setResetConfirmPassword("");
+                    }}
+                    className="text-slate-400 hover:text-slate-600 text-2xl leading-none"
+                  >
+                    ×
+                  </button>
+                </div>
+                
+                <div className="text-sm text-slate-600 bg-slate-50 rounded-lg p-3 border border-slate-200">
+                  💡 Enter your account email and choose a new password. No email will be sent.
+                </div>
+
+                <div className="space-y-3">
+                  <TextField label="Email" value={forgotEmail} onChange={(e) => setForgotEmail(e.target.value)} placeholder="your@email.com" />
+                  <TextField label="New Password" type="password" value={resetNewPassword} onChange={(e) => setResetNewPassword(e.target.value)} placeholder="••••••••" />
+                  <TextField label="Confirm Password" type="password" value={resetConfirmPassword} onChange={(e) => setResetConfirmPassword(e.target.value)} placeholder="••••••••" />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setShowForgot(false);
+                      setForgotEmail("");
+                      setResetNewPassword("");
+                      setResetConfirmPassword("");
+                    }}
+                    className="eco-btn-ghost flex-1"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!forgotEmail) { toast.error("Enter your email"); return; }
+                      if (resetNewPassword !== resetConfirmPassword) { toast.error("Passwords do not match"); return; }
+                      if (resetNewPassword.length < 6) { toast.error("Password must be at least 6 characters"); return; }
+                      try {
+                        const form = new URLSearchParams();
+                        form.append("email", forgotEmail);
+                        form.append("new_password", resetNewPassword);
+                        const res = await axios.post(`${API}/auth/reset-password-direct`, form, { headers: { "Content-Type": "application/x-www-form-urlencoded" } });
+                        toast.success(res.data?.message || "Password reset")
+                        setShowForgot(false);
+                        setForgotEmail("");
+                        setResetNewPassword("");
+                        setResetConfirmPassword("");
+                      } catch (err: any) {
+                        const msg = err?.response?.data?.detail || err?.message || "Reset failed";
+                        toast.error(msg);
+                      }
+                    }}
+                    className="eco-btn-primary flex-1"
+                  >
+                    Reset Password
+                  </button>
                 </div>
               </div>
             </div>
@@ -875,31 +909,31 @@ export default function NewListingPage() {
   /* ------------------------- APP VIEW ------------------------- */
   return (
     <div className="min-h-screen">
-      <header className="navbar">
-        <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
+      {/* Header */}
+      <header className="sticky top-0 z-40 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
+        <div className="container-eco py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img
-              src="/logo.png"
-              alt="E-Waste Logo"
-              className="w-9 h-9 rounded-md"
-            />
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight brand-text">
-              Smart Circular E-Waste Platform
-            </h1>
+            <img src="/logo.png" alt="E-Waste Logo" className="w-10 h-10 rounded-xl object-contain" />
+            <div>
+              <h1 className="text-lg font-bold text-gradient-eco">
+                Smart Circular E-Waste Platform
+              </h1>
+              <p className="text-xs text-slate-500">List Your Device</p>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <Link
               href={backHref}
-              className="rounded-xl border px-3 py-2 bg-white hover:bg-slate-100 text-sm"
+              className="eco-btn-ghost text-sm"
             >
-              ← Back to app
+              ← Dashboard
             </Link>
-            <span className="hidden sm:inline text-sm text-slate-700">
+            <span className="hidden sm:inline text-sm text-slate-700 font-medium">
               Hi, {auth.name}
             </span>
             <button
               onClick={logout}
-              className="btn bg-red-600 text-white px-3 py-2 hover:bg-red-700"
+              className="eco-btn-ghost text-sm text-red-600 hover:bg-red-50"
             >
               Logout
             </button>
@@ -907,184 +941,228 @@ export default function NewListingPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-6 py-10 grid lg:grid-cols-2 gap-10">
-        {/* LEFT: Form */}
-        <section className="card card-hover p-8 space-y-6">
+      <main className="container-eco py-10 grid lg:grid-cols-2 gap-10">
+        {/* LEFT: Input Form */}
+        <section className="eco-card space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-slate-900">
-              📦 Quick Listing
-            </h2>
-            <span className="badge">Fast — 1 min</span>
+            <div>
+              <h2 className="text-2xl font-bold text-slate-900">
+                List Your Device
+              </h2>
+              <p className="text-sm text-slate-600 mt-1">Get instant AI-powered insights</p>
+            </div>
+            <span className="eco-badge eco-badge-success">⚡ Fast — 1 min</span>
           </div>
-          <div className="divider" />
+          <div className="eco-divider" />
 
-          <form onSubmit={submitListing} className="space-y-6">
-            <div className="grid sm:grid-cols-2 gap-6">
-              <div className="space-y-1">
-                <Label>Brand</Label>
-                <select
-                  className="input"
-                  value={form.brand}
+          <form onSubmit={submitListing} className="space-y-8">
+            {/* Step 1: Device Info */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-[rgb(var(--eco-primary))]/10 flex items-center justify-center text-xs font-bold text-[rgb(var(--eco-primary))]">1</span>
+                Device Information
+              </h3>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Brand</Label>
+                  <select
+                    className="eco-select"
+                    value={form.brand}
+                    onChange={(e) =>
+                      setForm({ ...form, brand: e.target.value })
+                    }
+                  >
+                    <option>Apple</option>
+                    <option>Samsung</option>
+                    <option>OnePlus</option>
+                    <option>Realme</option>
+                    <option>Xiaomi</option>
+                    <option>Vivo</option>
+                    <option>Nokia</option>
+                    <option>Other</option>
+                  </select>
+                </div>
+
+                <TextField
+                  label="Model"
+                  value={form.model}
                   onChange={(e) =>
-                    setForm({ ...form, brand: e.target.value })
+                    setForm({ ...form, model: e.target.value })
                   }
-                >
-                  <option>Apple</option>
-                  <option>Samsung</option>
-                  <option>OnePlus</option>
-                  <option>Realme</option>
-                  <option>Xiaomi</option>
-                  <option>Vivo</option>
-                  <option>Nokia</option>
-                  <option>Other</option>
-                </select>
-              </div>
+                  placeholder="iPhone 12 / Galaxy S21"
+                  required
+                />
 
-              <TextField
-                label="Model"
-                value={form.model}
-                onChange={(e) =>
-                  setForm({ ...form, model: e.target.value })
-                }
-                placeholder="iPhone 12 / Galaxy S21"
-                required
-              />
-
-              <TextField
-                label="Age (months)"
-                type="number"
-                value={form.age_months}
-                onChange={(e) =>
-                  setForm({ ...form, age_months: e.target.value })
-                }
-                placeholder="12"
-                required
-              />
-              <TextField
-                label="Original Price (₹)"
-                type="number"
-                value={form.original_price}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    original_price: e.target.value,
-                  })
-                }
-                placeholder="30000"
-                required
-              />
-
-              <TextField
-                label="Battery (%)"
-                type="number"
-                value={form.battery_health}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    battery_health: e.target.value,
-                  })
-                }
-                placeholder="80"
-              />
-
-              <div className="space-y-1">
-                <Label>Storage (GB)</Label>
-                <select
-                  className="input"
-                  value={form.storage_gb}
+                <TextField
+                  label="Age (months)"
+                  type="number"
+                  value={form.age_months}
                   onChange={(e) =>
-                    setForm({ ...form, storage_gb: e.target.value })
+                    setForm({ ...form, age_months: e.target.value })
                   }
-                >
-                  <option>32</option>
-                  <option>64</option>
-                  <option>128</option>
-                  <option>256</option>
-                </select>
-              </div>
-
-              {/* User intent: what they want to do */}
-              <div className="space-y-1 sm:col-span-2">
-                <Label>What do you want to do?</Label>
-                <select
-                  className="input max-w-xs"
-                  value={form.intent}
-                  onChange={(e) => setForm({ ...form, intent: e.target.value })}
-                >
-                  <option value="sell">I want to sell this device</option>
-                  <option value="repair">I want to repair this device</option>
-                  <option value="recycle">I want to recycle / dispose safely</option>
-                </select>
-              </div>
-
-              {/* Location fields */}
-              <div className="space-y-1">
-                <Label>Latitude</Label>
-                <input
-                  className="input"
-                  value={form.lat}
-                  readOnly
-                  placeholder="(auto)"
+                  placeholder="12"
+                  required
                 />
-              </div>
-              <div className="space-y-1">
-                <Label>Longitude</Label>
-                <input
-                  className="input"
-                  value={form.lon}
-                  readOnly
-                  placeholder="(auto)"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>City</Label>
-                <input
-                  className="input"
-                  value={form.city}
+                <TextField
+                  label="Original Price (₹)"
+                  type="number"
+                  value={form.original_price}
                   onChange={(e) =>
-                    setForm({ ...form, city: e.target.value })
+                    setForm({
+                      ...form,
+                      original_price: e.target.value,
+                    })
                   }
-                  placeholder="City"
+                  placeholder="30000"
+                  required
                 />
-              </div>
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={getLocation}
-                  className="btn btn-ghost w-full"
-                >
-                  Use my location
-                </button>
+
+                <TextField
+                  label="Battery Health (%)"
+                  type="number"
+                  value={form.battery_health}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      battery_health: e.target.value,
+                    })
+                  }
+                  placeholder="80"
+                />
+
+                <div className="space-y-1">
+                  <Label>Storage (GB)</Label>
+                  <select
+                    className="eco-select"
+                    value={form.storage_gb}
+                    onChange={(e) =>
+                      setForm({ ...form, storage_gb: e.target.value })
+                    }
+                  >
+                    <option>32</option>
+                    <option>64</option>
+                    <option>128</option>
+                    <option>256</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-6">
+            {/* Step 2: Intent */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-[rgb(var(--eco-primary))]/10 flex items-center justify-center text-xs font-bold text-[rgb(var(--eco-primary))]">2</span>
+                Your Intent
+              </h3>
               <div className="space-y-1">
-                <Label>Product Image</Label>
-                <label className="flex items-center justify-center h-28 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 cursor-pointer transition">
+                <Label>What do you want to do?</Label>
+                <select
+                  className="eco-select"
+                  value={form.intent}
+                  onChange={(e) => setForm({ ...form, intent: e.target.value })}
+                >
+                  <option value="sell">💰 I want to sell this device</option>
+                  <option value="repair">🔧 I want to repair this device</option>
+                  <option value="recycle">♻️ I want to recycle / dispose safely</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Step 3: Location */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-[rgb(var(--eco-primary))]/10 flex items-center justify-center text-xs font-bold text-[rgb(var(--eco-primary))]">3</span>
+                Location
+              </h3>
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <Label>Latitude</Label>
                   <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0] || null;
-                      setFile(f);
-                      setPreview(f ? URL.createObjectURL(f) : null);
-                      setResult(null);
-                      setCropUrl(null);
-                    }}
+                    className="eco-input"
+                    value={form.lat}
+                    readOnly
+                    placeholder="(auto)"
                   />
-                  <span className="text-sm text-slate-600">
-                    {file ? file.name : "Click to choose file"}
-                  </span>
+                </div>
+                <div className="space-y-1">
+                  <Label>Longitude</Label>
+                  <input
+                    className="eco-input"
+                    value={form.lon}
+                    readOnly
+                    placeholder="(auto)"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>City</Label>
+                  <input
+                    className="eco-input"
+                    value={form.city}
+                    onChange={(e) =>
+                      setForm({ ...form, city: e.target.value })
+                    }
+                    placeholder="City"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={getLocation}
+                className="eco-btn-secondary w-full sm:w-auto"
+              >
+                📍 Use my location
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-[rgb(var(--eco-primary))]/10 flex items-center justify-center text-xs font-bold text-[rgb(var(--eco-primary))]">4</span>
+                Device Photo
+                <span className="text-xs font-normal text-slate-500">(Required)</span>
+              </h3>
+              <div className="space-y-3">
+                <input
+                  id="file-upload-input"
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+                    console.log("File input changed", f);
+                    setFile(f);
+                    setPreview(f ? URL.createObjectURL(f) : null);
+                    setResult(null);
+                    setCropUrl(null);
+                  }}
+                />
+                <label
+                  htmlFor="file-upload-input"
+                  className="flex flex-col items-center justify-center h-40 rounded-2xl border-2 border-dashed border-slate-300 bg-gradient-to-br from-slate-50 to-white hover:border-[rgb(var(--eco-primary))]/50 hover:bg-[rgb(var(--eco-primary))]/5 cursor-pointer transition-all duration-200 group"
+                >
+                  {file ? (
+                    <>
+                      <span className="text-2xl mb-2 pointer-events-none">✅</span>
+                      <span className="text-sm font-medium text-slate-700 group-hover:text-[rgb(var(--eco-primary))] transition pointer-events-none">
+                        {file.name}
+                      </span>
+                      <span className="text-xs text-slate-500 mt-1 pointer-events-none">Click to change photo</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-4xl mb-2 text-slate-300 group-hover:text-[rgb(var(--eco-primary))] transition-colors duration-200 pointer-events-none">📷</span>
+                      <span className="text-sm font-medium text-slate-600 group-hover:text-[rgb(var(--eco-primary))] transition-colors pointer-events-none">Click here to upload device photo</span>
+                      <span className="text-xs text-slate-400 mt-1 pointer-events-none">JPG, PNG, JPEG (max 10MB)</span>
+                    </>
+                  )}
                 </label>
                 {preview && (
-                  <div className="mt-2 relative inline-block">
+                  <div className="relative inline-block rounded-xl overflow-hidden border-2 border-slate-200">
                     <img
                       ref={imgRef}
                       src={preview}
                       alt="preview"
-                      className="h-28 w-auto rounded-lg border"
+                      className="h-32 w-auto"
                     />
                     <canvas
                       ref={canvasRef}
@@ -1098,104 +1176,124 @@ export default function NewListingPage() {
                   </div>
                 )}
               </div>
-
-              <div className="flex items-end gap-3">
-                <button
-                  type="submit"
-                  disabled={!canSubmit}
-                  className={cx(
-                    "btn btn-primary w-full",
-                    (!canSubmit || isLoading) &&
-                      "opacity-60 cursor-not-allowed",
-                  )}
-                >
-                  {isLoading ? "Uploading..." : "Upload & Predict"}
-                </button>
-              </div>
             </div>
 
-            {missing.length > 0 && (
-              <p className="text-xs text-red-600">
-                Required: {missing.join(", ").replaceAll("_", " ")}
-              </p>
-            )}
+            <div className="pt-4">
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                className={cx(
+                  "eco-btn-primary w-full text-base py-3",
+                  (!canSubmit || isLoading) &&
+                    "opacity-60 cursor-not-allowed",
+                )}
+              >
+                {isLoading ? (
+                  <>
+                    <span className="animate-pulse">⏳</span>
+                    <span className="ml-2">Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>✨</span>
+                    <span className="ml-2">Upload & Get AI Insights</span>
+                  </>
+                )}
+              </button>
+              {missing.length > 0 && (
+                <p className="text-xs text-red-600 mt-2">
+                  ⚠️ Required: {missing.join(", ").replaceAll("_", " ")}
+                </p>
+              )}
+            </div>
           </form>
         </section>
 
-        {/* RIGHT: Results + Map + Partners */}
+        {/* RIGHT: AI Insights & Results */}
         <section className="space-y-6">
-          <div className="card card-hover p-8 space-y-4">
-            <h2 className="text-lg font-semibold text-slate-900">
-              📈 Prediction (explanation)
-            </h2>
-
-            {isValidResult(result) && (
-              <div className="mt-2 text-xs text-slate-500">
-                <span>
-                  Detections: {" "}
-                  <strong>
-                    {Array.isArray(result.detections)
-                      ? result.detections.length
-                      : 0}
-                  </strong>
-                </span>
+          <div className="eco-card space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-slate-900">AI-Powered Insights</h2>
+                <p className="text-sm text-slate-600 mt-1">Expert analysis from machine learning</p>
               </div>
-            )}
+              {isValidResult(result) && (
+                <span className="eco-badge eco-badge-success">
+                  ✓ Analyzed
+                </span>
+              )}
+            </div>
 
             {!isValidResult(result) ? (
-              <p className="text-sm text-slate-600">
-                Submit a listing to see condition, price, RUL and nearby
-                partners.
-              </p>
+              <div className="eco-empty-state">
+                <div className="text-center text-slate-500">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[rgb(var(--eco-primary))]/10 to-[rgb(var(--eco-secondary))]/10 flex items-center justify-center">
+                    <span className="text-3xl">🤖</span>
+                  </div>
+                  <p className="text-sm font-medium text-slate-700 mb-1">Waiting for device upload</p>
+                  <p className="text-xs text-slate-500">Submit your listing to see AI predictions, pricing, and nearby repair partners</p>
+                </div>
+              </div>
             ) : (
               <>
-                <div className="rounded-xl border border-slate-200 bg-white p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="text-xs text-slate-500">
-                        Predicted condition
-                      </div>
-                      <div className="mt-1 text-lg font-semibold">
-                        {(result.image_condition &&
-                          result.image_condition.label) ||
-                          "Unknown"}
-                      </div>
-                      <div className="text-xs text-slate-500">
-                        Confidence:{" "}
-                        {result.image_condition &&
-                        typeof result.image_condition.confidence ===
-                          "number"
-                          ? result.image_condition.confidence.toFixed(2)
-                          : "—"}
-                      </div>
+                {/* Main Prediction Cards */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Condition Card */}
+                  <div className="rounded-xl border-2 border-emerald-100 bg-gradient-to-br from-emerald-50/50 to-white p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xl">📱</span>
+                      <div className="text-xs font-medium text-emerald-700">Condition</div>
                     </div>
-
-                    <div className="text-right">
-                      <div className="text-xs text-slate-500">
-                        Estimated impact
-                      </div>
-                      <div className="text-xl font-bold text-rose-600">
-                        {(() => {
-                          const top =
-                            Array.isArray(result.detections) &&
-                            result.detections.length
-                              ? result.detections[0]
-                              : null;
-                          const info =
-                            top && top.label
-                              ? labelInfo[top.label] ?? labelInfo.default
-                              : labelInfo.default;
-                          return info.short;
-                        })()}
-                      </div>
+                    <div className="text-2xl font-bold text-slate-900">
+                      {(result.image_condition &&
+                        result.image_condition.label) ||
+                        "Unknown"}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">
+                      Confidence:{" "}
+                      {result.image_condition &&
+                      typeof result.image_condition.confidence ===
+                        "number"
+                        ? (result.image_condition.confidence * 100).toFixed(1) + "%"
+                        : "—"}
                     </div>
                   </div>
 
-                  <div className="mt-4 text-sm text-slate-700">
+                  {/* Impact Card */}
+                  <div className="rounded-xl border-2 border-rose-100 bg-gradient-to-br from-rose-50/50 to-white p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xl">🔍</span>
+                      <div className="text-xs font-medium text-rose-700">Defect Impact</div>
+                    </div>
+                    <div className="text-2xl font-bold text-rose-600">
+                      {(() => {
+                        const top =
+                          Array.isArray(result.detections) &&
+                          result.detections.length
+                            ? result.detections[0]
+                            : null;
+                        const info =
+                          top && top.label
+                            ? labelInfo[top.label] ?? labelInfo.default
+                            : labelInfo.default;
+                        return info.short;
+                      })()}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-1">
+                      {Array.isArray(result.detections) ? result.detections.length : 0} detection(s)
+                    </div>
+                  </div>
+                </div>
+
+                {/* Explanation Box */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-sm text-slate-700 space-y-3">
                     {/* Prefer server-provided explanation (from ML + vision) when available */}
                     {Array.isArray(result?.price_explanation) && result.price_explanation.length ? (
                       <div>
-                        <div className="text-xs text-slate-500 mb-1">Why the price changed</div>
+                        <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                          💡 Why the price changed
+                        </div>
                         <ul className="list-disc pl-5 space-y-1 text-slate-700">
                           {result.price_explanation.map((t: string, i: number) => (
                             <li key={i} className="text-sm">{t}</li>
@@ -1203,62 +1301,66 @@ export default function NewListingPage() {
                         </ul>
                       </div>
                     ) : (
-                      (() => {
-                        const top =
-                          Array.isArray(result.detections) &&
-                          result.detections.length
-                            ? result.detections[0]
-                            : null;
-                        if (top && top.label) {
-                          const info =
-                            labelInfo[top.label] ?? labelInfo.default;
-                          return `${info.short}: ${info.explanation}`;
-                        }
-                        if (
-                          result.predictions &&
-                          (result.predictions.price_suggest ||
-                            result.predictions.rul_months)
-                        ) {
-                          return `Price and RUL estimated from device specs and image.`;
-                        }
-                        return `No specific defect was identified by the model.`;
-                      })()
+                      <p className="text-sm text-slate-700">
+                        {(() => {
+                          const top =
+                            Array.isArray(result.detections) &&
+                            result.detections.length
+                              ? result.detections[0]
+                              : null;
+                          if (top && top.label) {
+                            const info =
+                              labelInfo[top.label] ?? labelInfo.default;
+                            return `${info.short}: ${info.explanation}`;
+                          }
+                          if (
+                            result.predictions &&
+                            (result.predictions.price_suggest ||
+                              result.predictions.rul_months)
+                          ) {
+                            return `Price and RUL estimated from device specs and image.`;
+                          }
+                          return `No specific defect was identified by the model.`;
+                        })()}
+                      </p>
                     )}
                   </div>
 
                   {Array.isArray(result.detections) &&
                   result.detections.length ? (
-                    <div className="mt-3 text-xs space-y-2">
-                      <div className="text-slate-600 mb-2">
-                        Detected issues
+                    <div className="mt-4 pt-4 border-t border-slate-200">
+                      <div className="text-xs font-semibold text-slate-700 mb-3">
+                        🔍 Detected Issues
                       </div>
-                      {result.detections.map((d: any, i: number) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-3"
-                        >
-                          <div className="w-28 text-xs">
-                            {d.label || d.name || "issue"}
+                      <div className="space-y-2">
+                        {result.detections.map((d: any, i: number) => (
+                          <div
+                            key={i}
+                            className="flex items-center gap-3"
+                          >
+                            <div className="w-32 text-xs font-medium text-slate-700">
+                              {d.label || d.name || "issue"}
+                            </div>
+                            <div className="flex-1 bg-slate-200 rounded-full h-2 overflow-hidden">
+                              <div
+                                style={{
+                                  width: `${Math.round(
+                                    ((d.confidence ?? d.score ?? 0) as number) *
+                                      100,
+                                  )}%`,
+                                }}
+                                className="h-2 bg-gradient-to-r from-[rgb(var(--eco-primary))] to-[rgb(var(--eco-secondary))]"
+                              />
+                            </div>
+                            <div className="text-xs w-12 text-right font-semibold text-slate-700">
+                              {Math.round(
+                                ((d.confidence ?? d.score ?? 0) as number) * 100,
+                              )}
+                              %
+                            </div>
                           </div>
-                          <div className="flex-1 bg-slate-100 rounded h-3 overflow-hidden">
-                            <div
-                              style={{
-                                width: `${Math.round(
-                                  ((d.confidence ?? d.score ?? 0) as number) *
-                                    100,
-                                )}%`,
-                              }}
-                              className="h-3 bg-green-500"
-                            />
-                          </div>
-                          <div className="text-xs w-10 text-right">
-                            {Math.round(
-                              ((d.confidence ?? d.score ?? 0) as number) * 100,
-                            )}
-                            %
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -1266,83 +1368,88 @@ export default function NewListingPage() {
                 {cropUrl &&
                 Array.isArray(result.detections) &&
                 result.detections.length ? (
-                  <div className="mt-4 flex gap-4 items-start">
-                    <div className="w-28 h-28 flex-shrink-0 rounded overflow-hidden border">
-                      <img
-                        src={cropUrl}
-                        alt="defect crop"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium">
-                        {(() => {
-                          const top = [...result.detections].sort(
-                            (a: any, b: any) =>
-                              (b.confidence ?? b.score ?? 0) -
-                              (a.confidence ?? a.score ?? 0),
-                          )[0];
-                          return (
-                            labelInfo[top?.label]?.short ||
-                            top?.label ||
-                            "Defect"
-                          );
-                        })()}
+                  <div className="rounded-xl border-2 border-slate-200 bg-white p-4">
+                    <div className="flex gap-4 items-start">
+                      <div className="w-32 h-32 flex-shrink-0 rounded-xl overflow-hidden border-2 border-slate-300">
+                        <img
+                          src={cropUrl}
+                          alt="defect crop"
+                          className="w-full h-full object-cover"
+                        />
                       </div>
-                      <div className="text-xs text-slate-600 mt-1">
-                        {(() => {
-                          const top = [...result.detections].sort(
-                            (a: any, b: any) =>
-                              (b.confidence ?? b.score ?? 0) -
-                              (a.confidence ?? a.score ?? 0),
-                          )[0];
-                          const info =
-                            labelInfo[top?.label] ?? labelInfo.default;
-                          return `${info.explanation} Confidence ${(top.confidence ??
-                            top.score ??
-                            0
-                          ).toFixed(2)}`;
-                        })()}
+                      <div className="flex-1">
+                        <div className="eco-badge eco-badge-warning mb-2">
+                          {(() => {
+                            const top = [...result.detections].sort(
+                              (a: any, b: any) =>
+                                (b.confidence ?? b.score ?? 0) -
+                                (a.confidence ?? a.score ?? 0),
+                            )[0];
+                            return (
+                              labelInfo[top?.label]?.short ||
+                              top?.label ||
+                              "Defect"
+                            );
+                          })()}
+                        </div>
+                        <p className="text-sm text-slate-600 leading-relaxed">
+                          {(() => {
+                            const top = [...result.detections].sort(
+                              (a: any, b: any) =>
+                                (b.confidence ?? b.score ?? 0) -
+                                (a.confidence ?? a.score ?? 0),
+                            )[0];
+                            const info =
+                              labelInfo[top?.label] ?? labelInfo.default;
+                            return `${info.explanation} Confidence: ${((top.confidence ??
+                              top.score ??
+                              0) * 100).toFixed(1)}%`;
+                          })()}
+                        </p>
                       </div>
                     </div>
                   </div>
                 ) : null}
 
-                <div className="grid sm:grid-cols-3 gap-4 mt-4">
-                  <div className="rounded-xl border p-4 bg-white">
-                    <div className="text-xs text-slate-500">
-                      Suggested price
+                {/* Price, RUL, Decision Cards */}
+                <div className="grid sm:grid-cols-3 gap-4">
+                  <div className="rounded-xl border-2 border-blue-100 bg-gradient-to-br from-blue-50/50 to-white p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">💰</span>
+                      <div className="text-xs font-medium text-blue-700">Suggested Price</div>
                     </div>
-                    <div className="text-lg font-semibold mt-1">
-                      ₹
-                      {result?.predictions?.price_suggest ??
+                    <div className="text-2xl font-bold text-slate-900">
+                      ₹{result?.predictions?.price_suggest ??
                         result?.predictions?.predicted_price ??
                         "—"}
                     </div>
-                    <div className="text-xs text-slate-400 mt-1">
+                    <div className="text-xs text-slate-500 mt-1">
                       Original: ₹{form.original_price || "—"}
                     </div>
                   </div>
 
-                  <div className="rounded-xl border p-4 bg-white">
-                    <div className="text-xs text-slate-500">
-                      Remaining useful life
+                  <div className="rounded-xl border-2 border-purple-100 bg-gradient-to-br from-purple-50/50 to-white p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">⏳</span>
+                      <div className="text-xs font-medium text-purple-700">Remaining Life</div>
                     </div>
-                    <div className="text-lg font-semibold mt-1">
-                      {result?.predictions?.rul_months ?? "—"} months
+                    <div className="text-2xl font-bold text-slate-900">
+                      {result?.predictions?.rul_months ?? "—"}
                     </div>
+                    <div className="text-xs text-slate-500 mt-1">months</div>
                   </div>
 
-                  <div className="rounded-xl border p-4 bg-white">
-                    <div className="text-xs text-slate-500">
-                      Recommendation
+                  <div className="rounded-xl border-2 border-amber-100 bg-gradient-to-br from-amber-50/50 to-white p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">🎯</span>
+                      <div className="text-xs font-medium text-amber-700">Decision</div>
                     </div>
-                    <div className="text-lg font-semibold mt-1">
+                    <div className="text-lg font-bold text-slate-900">
                       {result?.predictions?.decision ?? "—"}
                     </div>
-                    <div className="text-xs text-slate-400 mt-2">
-                      CO₂ saved:{" "}
-                      {result?.predictions?.co2_saved_kg ?? "—"} kg
+                    <div className="text-xs text-slate-500 mt-2 flex items-center gap-1">
+                      <span>🌱</span>
+                      <span>CO₂ saved: {result?.predictions?.co2_saved_kg ?? "—"} kg</span>
                     </div>
                   </div>
                 </div>
@@ -1351,11 +1458,11 @@ export default function NewListingPage() {
           </div>
 
           {preview && (
-            <div className="rounded-xl border bg-white p-4">
-              <div className="text-xs text-slate-500 mb-2">
-                Uploaded image (detections overlay)
+            <div className="eco-card">
+              <div className="text-xs font-semibold text-slate-700 mb-3">
+                📷 Uploaded Image (with AI detections)
               </div>
-              <div className="relative w-full">
+              <div className="relative w-full rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50">
                 <img
                   ref={imgRef}
                   src={preview}
@@ -1376,81 +1483,99 @@ export default function NewListingPage() {
           )}
 
           {map && (
-            <div className="rounded-2xl overflow-hidden ring-1 ring-black/5 shadow-sm">
-              <iframe
-                title="map"
-                src={map.src}
-                className="w-full h-[180px]"
-              />
+            <div className="eco-card">
+              <div className="text-sm font-semibold text-slate-900 mb-3">
+                🗺️ Device Location
+              </div>
+              <div className="rounded-xl overflow-hidden border-2 border-slate-200">
+                <iframe
+                  title="map"
+                  src={map.src}
+                  className="w-full h-[280px]"
+                />
+              </div>
               <a
                 href={map.link}
                 target="_blank"
                 rel="noreferrer"
-                className="block text-center text-sm py-2 text-sky-700"
+                className="block text-center text-sm py-3 text-[rgb(var(--eco-primary))] hover:text-[rgb(var(--eco-secondary))] font-medium transition"
               >
-                Open in OpenStreetMap
+                Open in OpenStreetMap →
               </a>
             </div>
           )}
 
           {Array.isArray(result?.nearby_partners) &&
           result.nearby_partners.length ? (
-            <div className="card card-hover p-6">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="font-semibold text-slate-900">
-                  🏪 Nearby Repair / Recycling
-                </h3>
-                <span className="text-xs text-slate-500">
+            <div className="eco-card">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    🏪 Nearby Repair & Recycling
+                  </h3>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Partners within range of your device
+                  </p>
+                </div>
+                <span className="eco-badge eco-badge-info">
                   {result.nearby_partners.length} found
                 </span>
               </div>
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {result.nearby_partners.map((p: any, i: number) => (
                   <li
                     key={i}
-                    className="rounded-lg border bg-white px-4 py-3 text-sm flex items-center justify-between"
+                    className="rounded-xl border-2 border-slate-200 bg-white px-4 py-4 hover:border-[rgb(var(--eco-primary))]/30 hover:shadow-md transition"
                   >
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <div className="font-medium">{p.name}</div>
-                        <div className="text-xs">
-                          <span className="inline-block px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="font-semibold text-slate-900">{p.name}</div>
+                          {p.kyc_status === "verified" && (
+                            <span className="eco-badge eco-badge-success text-xs">
+                              ✓ Verified
+                            </span>
+                          )}
+                          <span className="eco-badge eco-badge-secondary text-xs">
                             {p.type || p.partner_type || 'partner'}
                           </span>
                         </div>
-                      </div>
-                      <div className="text-slate-500 text-xs mt-1 flex items-center gap-3">
-                        <div>
-                          {typeof p.distance_km === 'number' && !isNaN(p.distance_km)
-                            ? `${p.distance_km.toFixed(2)} km`
-                            : '—'}
+                        <div className="text-slate-500 text-xs flex items-center gap-4">
+                          <div className="flex items-center gap-1">
+                            <span>📍</span>
+                            <span>
+                              {typeof p.distance_km === 'number' && !isNaN(p.distance_km)
+                                ? `${p.distance_km.toFixed(2)} km away`
+                                : 'Distance unknown'}
+                            </span>
+                          </div>
+                          {p.lat != null && p.lon != null && (
+                            <div className="text-slate-400">
+                              {Number(p.lat).toFixed(4)}, {Number(p.lon).toFixed(4)}
+                            </div>
+                          )}
                         </div>
-                        <div>
-                          {p.lat != null && p.lon != null
-                            ? `${Number(p.lat).toFixed(4)}, ${Number(p.lon).toFixed(4)}`
-                            : ''}
-                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-3">
-                      {p.contact_phone ? (
+                      <div className="flex items-center gap-2 ml-4">
+                        {p.contact_phone && (
+                          <a
+                            className="eco-btn-secondary text-xs px-3 py-1.5"
+                            href={`tel:${p.contact_phone.replace(/\s+/g, '')}`}
+                          >
+                            📞 Call
+                          </a>
+                        )}
+
                         <a
-                          className="text-xs bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full"
-                          href={`tel:${p.contact_phone.replace(/\s+/g, '')}`}
+                          className="eco-btn-ghost text-xs px-3 py-1.5"
+                          href={`https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=16/${p.lat}/${p.lon}`}
+                          target="_blank"
+                          rel="noreferrer"
                         >
-                          Call
+                          View →
                         </a>
-                      ) : null}
-
-                      <a
-                        className="text-sky-700 text-xs underline"
-                        href={`https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=16/${p.lat}/${p.lon}`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        View
-                      </a>
+                      </div>
                     </div>
                   </li>
                 ))}

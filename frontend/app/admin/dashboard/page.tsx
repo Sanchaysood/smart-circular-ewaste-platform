@@ -218,22 +218,26 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-[#ECFDF5] via-[#E6F7F3] to-[#F5F7F6] relative">
+      {/* Ambient gradient orbs */}
+      <div className="fixed top-0 left-0 w-96 h-96 bg-gradient-to-br from-[rgb(var(--eco-primary))] to-[rgb(var(--eco-secondary))] rounded-full blur-3xl opacity-5" />
+      <div className="fixed bottom-0 right-0 w-96 h-96 bg-gradient-to-tl from-[rgb(var(--eco-accent))] to-[rgb(var(--eco-secondary))] rounded-full blur-3xl opacity-5" />
+      
       {/* Top navbar */}
-      <div className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Image src="/logo.png" alt="Logo" width={28} height={28} className="rounded" />
+            <Image src="/logo.png" alt="Logo" width={32} height={32} className="rounded-xl" />
             <div className="flex items-baseline gap-2 select-none">
-              <span className="text-xl font-semibold text-slate-900">Smart Circular</span>
-              <span className="text-xl font-semibold text-sky-600">E‑Waste Platform</span>
+              <span className="text-xl font-bold text-slate-900">Smart Circular</span>
+              <span className="text-xl font-bold text-gradient-eco">E‑Waste Platform</span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-slate-600">Hi, admin</span>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-slate-600">👤 Hi, <span className="font-semibold text-slate-900">admin</span></span>
             <button
               onClick={logout}
-              className="px-4 py-2 text-sm rounded-full bg-red-600 text-white hover:bg-red-700"
+              className="eco-btn-ghost text-sm text-red-600 hover:bg-red-50"
             >
               Logout
             </button>
@@ -241,73 +245,134 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto p-8">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+      <div className="max-w-6xl mx-auto p-8 relative z-10">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">🛡️ Admin Dashboard</h1>
+          <p className="text-slate-600">Manage platform operations and partner verification</p>
         </div>
 
-        <div className="mb-4 text-sm text-slate-600 bg-white p-4 rounded shadow-sm">
-          <strong>Admin Access: This dashboard allows authorized administrators to manage partner verification, users, and platform listings securely.</strong>
+        <div className="eco-card mb-6 bg-gradient-to-br from-blue-50/50 to-indigo-50/50 border-2 border-blue-100">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xl flex-shrink-0">
+              ℹ️
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-blue-900 mb-1">Admin Access</h3>
+              <p className="text-sm text-blue-800">This dashboard allows authorized administrators to manage partner verification, users, and platform listings securely.</p>
+            </div>
+          </div>
         </div>
 
-        <div className="bg-white shadow rounded p-4">
-          <div className="mb-4 flex gap-2">
-            <button className={"px-3 py-1 rounded " + (tab === "partners" ? "bg-sky-600 text-white" : "border") } onClick={() => setTab("partners")}>Partners</button>
-            <button className={"px-3 py-1 rounded " + (tab === "users" ? "bg-sky-600 text-white" : "border") } onClick={() => setTab("users")}>Users</button>
-            <button className={"px-3 py-1 rounded " + (tab === "listings" ? "bg-sky-600 text-white" : "border") } onClick={() => setTab("listings")}>Listings</button>
+        <div className="eco-card">
+          <div className="mb-6 flex gap-3">
+            <button 
+              className={tab === "partners" ? "eco-btn-primary" : "eco-btn-secondary"}
+              onClick={() => setTab("partners")}
+            >
+              🏪 Partners
+            </button>
+            <button 
+              className={tab === "users" ? "eco-btn-primary" : "eco-btn-secondary"}
+              onClick={() => setTab("users")}
+            >
+              👥 Users
+            </button>
+            <button 
+              className={tab === "listings" ? "eco-btn-primary" : "eco-btn-secondary"}
+              onClick={() => setTab("listings")}
+            >
+              📱 Listings
+            </button>
           </div>
 
           {loading ? (
-            <div>Loading…</div>
+            <div className="text-center py-12">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 animate-spin">
+                <div className="w-10 h-10 rounded-full bg-white" />
+              </div>
+              <p className="mt-3 text-sm text-slate-600">Loading admin data...</p>
+            </div>
           ) : tab === "partners" ? (
             partners.length === 0 ? (
-              <div className="text-sm text-slate-500">No partners found.</div>
+              <div className="eco-empty-state">
+                <div className="text-5xl mb-3">🏪</div>
+                <h3 className="text-lg font-semibold text-slate-800 mb-1">No Partners Yet</h3>
+                <p className="text-sm text-slate-600">Partner registrations will appear here for verification.</p>
+              </div>
             ) : (
+              <div className="overflow-x-auto rounded-lg">
               <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left">
-                      <th className="py-2 px-4">ID</th>
-                      <th className="py-2 px-4">Name</th>
-                      <th className="py-2 px-4">Type</th>
-                      <th className="py-2 px-4">City</th>
-                      <th className="py-2 px-4">Phone</th>
-                      <th className="py-2 px-4">KYC</th>
-                      <th className="py-2 px-4">Actions</th>
+                    <tr className="border-b-2 border-emerald-100 bg-gradient-to-r from-emerald-50/50 to-teal-50/50">
+                      <th className="text-left py-3 px-4 font-bold text-slate-700">ID</th>
+                      <th className="text-left py-3 px-4 font-bold text-slate-700">Name</th>
+                      <th className="text-left py-3 px-4 font-bold text-slate-700">Type</th>
+                      <th className="text-left py-3 px-4 font-bold text-slate-700">City</th>
+                      <th className="text-left py-3 px-4 font-bold text-slate-700">Phone</th>
+                      <th className="text-left py-3 px-4 font-bold text-slate-700">KYC Status</th>
+                      <th className="text-left py-3 px-4 font-bold text-slate-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {partners.map((p) => (
-                      <tr key={p.id} className="border-t">
-                        <td className="py-3 px-4 text-sm text-slate-700">{p.id}</td>
-                        <td className="py-3 px-4">{p.name || "-"}</td>
-                        <td className="py-3 px-4">{p.type || "-"}</td>
-                        <td className="py-3 px-4">{p.city || "-"}</td>
-                        <td className="py-3 px-4">{p.contact_phone || "(hidden)"}</td>
-                        <td className="py-3 px-4">{p.kyc_status || "not_submitted"}</td>
+                      <tr key={p.id} className="border-t border-slate-100 hover:bg-emerald-50/30 transition-colors">
+                        <td className="py-3 px-4 text-sm text-slate-700 font-medium">{p.id}</td>
+                        <td className="py-3 px-4 font-medium text-slate-800">{p.name || "-"}</td>
+                        <td className="py-3 px-4 text-slate-600">{p.type || "-"}</td>
+                        <td className="py-3 px-4 text-slate-600">{p.city || "-"}</td>
+                        <td className="py-3 px-4 text-slate-600">{p.contact_phone || "(hidden)"}</td>
                         <td className="py-3 px-4">
-                          <div className="flex gap-3">
-                            <button className="btn btn-primary px-3 py-1" onClick={() => doAction(p.id, "verify")}>Verify</button>
-                            <button className="btn px-3 py-1 bg-red-600 text-white" onClick={() => doAction(p.id, "reject")}>Reject</button>
+                          <span className={`eco-badge ${
+                            p.kyc_status === "verified" ? "eco-badge-success" :
+                            p.kyc_status === "rejected" ? "eco-badge-danger" :
+                            p.kyc_status === "pending" ? "eco-badge-warning" :
+                            "eco-badge-secondary"
+                          }`}>
+                            {p.kyc_status === "verified" ? "✓ Verified" :
+                             p.kyc_status === "rejected" ? "✗ Rejected" :
+                             p.kyc_status === "pending" ? "⏳ Pending" :
+                             "Not Submitted"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex gap-2">
+                            <button 
+                              className="px-4 py-1.5 text-sm font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm" 
+                              onClick={() => doAction(p.id, "verify")}
+                            >
+                              ✓ Verify
+                            </button>
+                            <button 
+                              className="px-4 py-1.5 text-sm font-medium rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors shadow-sm" 
+                              onClick={() => doAction(p.id, "reject")}
+                            >
+                              ✗ Reject
+                            </button>
                           </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
             )
           ) : tab === "listings" ? (
             /* Listings tab */
             listings.length === 0 ? (
-              <div className="text-sm text-slate-500">No listings found.</div>
+              <div className="eco-empty-state">
+                <div className="text-5xl mb-3">📱</div>
+                <h3 className="text-lg font-semibold text-slate-800 mb-1">No Listings Found</h3>
+                <p className="text-sm text-slate-600">Device listings will appear here for moderation.</p>
+              </div>
             ) : (
               <div className="space-y-4">
-                <div className="flex items-center justify-between py-2">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm text-slate-600">Status:</label>
+                <div className="flex items-center justify-between py-3 px-4 bg-gradient-to-r from-emerald-50/50 to-teal-50/50 rounded-lg border border-emerald-100">
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-slate-700">📊 Status:</label>
                     <select
                       value={listingStatus}
                       onChange={(e) => setListingStatus(e.target.value as any)}
-                      className="px-2 py-1 text-sm border rounded bg-white"
+                      className="eco-select"
                     >
                       <option value="all">All</option>
                       <option value="created">Created</option>
@@ -317,87 +382,89 @@ export default function AdminDashboardPage() {
                   </div>
                   <button
                     onClick={() => fetchListings(listingStatus)}
-                    className="px-3 py-1 text-sm border rounded hover:bg-slate-50"
+                    className="eco-btn-secondary"
                   >
-                    Refresh
+                    🔄 Refresh
                   </button>
                 </div>
                 {listings.map((listing) => (
                   <div
                     key={listing.id}
-                    className="border rounded p-4 bg-gray-50"
+                    className="eco-card hover:shadow-lg transition-all duration-300 hover:scale-[1.01]"
                   >
                     <div className="flex justify-between items-start mb-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="font-semibold">Listing #{listing.id}</span>
-                          <span className={`px-2 py-1 text-xs rounded ${
-                            listing.status === "hidden" ? "bg-yellow-100 text-yellow-800" :
-                            listing.status === "removed" ? "bg-red-100 text-red-800" :
-                            "bg-green-100 text-green-800"
+                          <span className="text-lg font-bold text-slate-800">📱 Listing #{listing.id}</span>
+                          <span className={`eco-badge ${
+                            listing.status === "hidden" ? "eco-badge-warning" :
+                            listing.status === "removed" ? "eco-badge-danger" :
+                            "eco-badge-success"
                           }`}>
-                            {listing.status}
+                            {listing.status === "hidden" ? "⏸️ Hidden" :
+                             listing.status === "removed" ? "🗑️ Removed" :
+                             "✓ Active"}
                           </span>
                         </div>
-                        <div className="text-sm text-gray-600 mb-2">
-                          <p><strong>User:</strong> {listing.user_email || "Unknown"}</p>
-                          <p><strong>Intent:</strong> {listing.intent || "N/A"}</p>
-                          <p><strong>Created:</strong> {listing.created_at ? new Date(listing.created_at).toLocaleDateString() : "N/A"}</p>
+                        <div className="text-sm text-slate-600 mb-3 space-y-1 bg-slate-50/50 p-3 rounded-lg border border-slate-100">
+                          <p><strong className="text-slate-700">👤 User:</strong> {listing.user_email || "Unknown"}</p>
+                          <p><strong className="text-slate-700">🎯 Intent:</strong> {listing.intent || "N/A"}</p>
+                          <p><strong className="text-slate-700">📅 Created:</strong> {listing.created_at ? new Date(listing.created_at).toLocaleDateString() : "N/A"}</p>
                         </div>
                         {listing.image && (
-                          <div className="mt-2 flex items-start gap-4">
+                          <div className="mt-3 flex items-start gap-4 bg-white/50 p-3 rounded-lg border border-emerald-100">
                             {/* Preview (served from backend /uploads) */}
                             <img
                               src={`${API}/uploads/${listing.image}`}
                               alt="Listing image"
-                              className="w-48 h-48 object-cover rounded border border-gray-200 bg-white"
+                              className="w-48 h-48 object-cover rounded-lg border-2 border-emerald-200 bg-white shadow-sm"
                               onError={(e) => {
                                 const el = e.target as HTMLImageElement;
                                 el.style.display = "none";
                               }}
                             />
-                            <div className="text-xs text-gray-600">
-                              <p><strong>File:</strong> {listing.image}</p>
+                            <div className="text-xs text-slate-600 flex-1">
+                              <p className="mb-1"><strong className="text-slate-700">📎 File:</strong> {listing.image}</p>
                               <a
                                 href={`${API}/uploads/${listing.image}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-sky-600 hover:underline"
+                                className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-700 font-medium hover:underline"
                               >
-                                Open full image
+                                🔍 Open full image
                               </a>
                             </div>
                           </div>
                         )}
                         {Object.keys(listing.payload).length > 0 && (
-                          <div className="mt-2 text-xs bg-white p-2 rounded border border-gray-200 max-h-32 overflow-auto">
-                            <p className="font-semibold mb-1">Payload:</p>
-                            <pre className="text-gray-700">{JSON.stringify(listing.payload, null, 2)}</pre>
+                          <div className="mt-3 text-xs bg-gradient-to-br from-slate-50 to-slate-100 p-3 rounded-lg border border-slate-200 max-h-32 overflow-auto">
+                            <p className="font-bold mb-2 text-slate-700">📦 Payload Data:</p>
+                            <pre className="text-slate-600 font-mono">{JSON.stringify(listing.payload, null, 2)}</pre>
                           </div>
                         )}
                       </div>
-                      <div className="flex gap-2 flex-col">
+                      <div className="flex gap-2 flex-col ml-4">
                         {listing.status !== "hidden" && listing.status !== "removed" && (
                           <button
                             onClick={() => hideListing(listing.id)}
-                            className="px-3 py-1 text-sm bg-yellow-500 text-white rounded hover:bg-yellow-600"
+                            className="px-4 py-2 text-sm font-medium bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors shadow-sm whitespace-nowrap"
                           >
-                            Hide
+                            🚫 Hide
                           </button>
                         )}
                         {(listing.status === "hidden" || listing.status === "removed") && (
                           <button
                             onClick={() => restoreListing(listing.id)}
-                            className="px-3 py-1 text-sm bg-sky-600 text-white rounded hover:bg-sky-700"
+                            className="px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm whitespace-nowrap"
                           >
-                            Restore
+                            ↺ Restore
                           </button>
                         )}
                         <button
                           onClick={() => deleteListing(listing.id)}
-                          className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                          className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors shadow-sm whitespace-nowrap"
                         >
-                          Delete
+                          🗑️ Delete
                         </button>
                       </div>
                     </div>
@@ -407,30 +474,46 @@ export default function AdminDashboardPage() {
             )
           ) : (
             users.length === 0 ? (
-              <div className="text-sm text-slate-500">No users found.</div>
+              <div className="eco-empty-state">
+                <div className="text-5xl mb-3">👥</div>
+                <h3 className="text-lg font-semibold text-slate-800 mb-1">No Users Found</h3>
+                <p className="text-sm text-slate-600">Registered users will appear here.</p>
+              </div>
             ) : (
+              <div className="overflow-x-auto rounded-lg">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left">
-                    <th className="py-2">ID</th>
-                    <th className="py-2">Name</th>
-                    <th className="py-2">Email</th>
-                    <th className="py-2">Role</th>
-                    <th className="py-2">Created</th>
+                  <tr className="border-b-2 border-emerald-100 bg-gradient-to-r from-emerald-50/50 to-teal-50/50">
+                    <th className="text-left py-3 px-4 font-bold text-slate-700">ID</th>
+                    <th className="text-left py-3 px-4 font-bold text-slate-700">Name</th>
+                    <th className="text-left py-3 px-4 font-bold text-slate-700">Email</th>
+                    <th className="text-left py-3 px-4 font-bold text-slate-700">Role</th>
+                    <th className="text-left py-3 px-4 font-bold text-slate-700">Created</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map((u) => (
-                    <tr key={u.id} className="border-t">
-                      <td className="py-2">{u.id}</td>
-                      <td className="py-2">{u.name || "-"}</td>
-                      <td className="py-2">{u.email}</td>
-                      <td className="py-2">{u.role}</td>
-                      <td className="py-2">{u.created_at || "-"}</td>
+                    <tr key={u.id} className="border-t border-slate-100 hover:bg-emerald-50/30 transition-colors">
+                      <td className="py-3 px-4 text-sm text-slate-700 font-medium">{u.id}</td>
+                      <td className="py-3 px-4 font-medium text-slate-800">{u.name || "-"}</td>
+                      <td className="py-3 px-4 text-slate-600">{u.email}</td>
+                      <td className="py-3 px-4">
+                        <span className={`eco-badge ${
+                          u.role === "admin" ? "eco-badge-danger" :
+                          u.role === "partner" ? "eco-badge-info" :
+                          "eco-badge-secondary"
+                        }`}>
+                          {u.role === "admin" ? "🔑 Admin" :
+                           u.role === "partner" ? "🏪 Partner" :
+                           "👤 Customer"}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 text-sm">{u.created_at || "-"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
             )
           )}
         </div>

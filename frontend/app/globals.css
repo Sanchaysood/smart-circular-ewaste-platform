@@ -2,36 +2,612 @@
 @tailwind components;
 @tailwind utilities;
 
-/* tokens */
-:root{
-  --brand-green:#10b981;
-  --brand-blue:#3b82f6;
-}
-html,body{ @apply bg-slate-50 text-slate-900; }
+/* ========================================
+   SMART CIRCULAR E-WASTE PLATFORM
+   Nature × Technology Fusion
+   Premium Eco-Tech Design System
+   ======================================== */
 
-/* logo cap */
-img[alt="logo"], img[alt="E-Waste Logo"]{
-  max-width:48px; max-height:48px; @apply rounded-md;
+@layer base {
+  :root {
+    /* 🎨 EXACT COLOR PALETTE - BRAND DEFINITION */
+    
+    /* Primary (Eco Green) - #2F7D5B */
+    --eco-primary: 47 125 91;
+    --eco-primary-light: 82 158 132;
+    --eco-primary-dark: 29 95 70;
+    
+    /* Secondary (Teal Tech) - #2BAE9E */
+    --eco-secondary: 43 174 158;
+    --eco-secondary-light: 86 200 187;
+    --eco-secondary-dark: 25 130 118;
+    
+    /* Accent (Energy Lime) - #A3E635 */
+    --eco-accent: 163 230 53;
+    --eco-accent-light: 183 238 102;
+    --eco-accent-dark: 132 193 26;
+    
+    /* Backgrounds */
+    --bg-light: 245 247 246;
+    --bg-gradient-start: 236 253 245;
+    --bg-gradient-end: 230 247 243;
+    
+    /* Text */
+    --text-primary: 15 23 42;
+    --text-muted: 100 116 139;
+    
+    /* Borders & Surfaces */
+    --border-soft: 226 232 240;
+    --surface-white: 255 255 255;
+    
+    /* Semantic Colors */
+    --success: 34 197 94;
+    --warning: 245 158 11;
+    --error: 239 68 68;
+    --info: 59 130 246;
+    
+    /* Neutral Scale (Slate-based) */
+    --neutral-50: 248 250 252;
+    --neutral-100: 241 245 249;
+    --neutral-200: 226 232 240;
+    --neutral-300: 203 213 225;
+    --neutral-400: 148 163 184;
+    --neutral-500: 100 116 139;
+    --neutral-600: 71 85 105;
+    --neutral-700: 51 65 85;
+    --neutral-800: 30 41 59;
+    --neutral-900: 15 23 42;
+    
+    /* Spatial System */
+    --spacing-unit: 0.25rem;
+    --radius-sm: 0.5rem;
+    --radius-md: 0.75rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.25rem;
+    --radius-2xl: 1.5rem;
+    --radius-3xl: 2rem;
+    
+    /* Elevation & Shadow System (Subtle & Natural) */
+    --shadow-xs: 0 1px 3px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
+    --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06), 0 2px 4px rgba(15, 23, 42, 0.03);
+    --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
+    --shadow-lg: 0 8px 32px rgba(15, 23, 42, 0.10), 0 4px 16px rgba(15, 23, 42, 0.06);
+    --shadow-xl: 0 16px 48px rgba(15, 23, 42, 0.12), 0 8px 24px rgba(15, 23, 42, 0.08);
+    --shadow-eco: 0 8px 32px rgba(47, 125, 91, 0.15), 0 4px 16px rgba(47, 125, 91, 0.08);
+    
+    /* Typography Scale */
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+    --font-size-3xl: 1.875rem;
+    --font-size-4xl: 2.25rem;
+    --font-size-5xl: 3rem;
+    
+    /* Animation System */
+    --duration-fast: 150ms;
+    --duration-base: 250ms;
+    --duration-slow: 350ms;
+    --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
 }
 
-/* UI helpers you use */
-.navbar{ @apply bg-white border-b border-slate-200; }
-.card{ @apply bg-white rounded-2xl border border-slate-200 shadow-[0_8px_30px_rgba(2,8,23,0.06)]; }
-.card-hover{ @apply transition-transform duration-200; }
-.card-hover:hover{ transform: translateY(-1px); }
-.label{ @apply text-sm font-medium text-slate-700; }
-.input{ @apply w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-slate-400; }
-.btn{ @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm font-medium; }
-.btn-ghost{ @apply btn border border-slate-200 bg-white hover:bg-slate-50; }
-.btn-danger{ @apply btn bg-red-600 text-white hover:bg-red-700; }
-.btn-primary{
-  @apply inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-white text-sm font-semibold transition;
-  background: linear-gradient(135deg,var(--brand-blue),var(--brand-green));
+@layer base {
+  html {
+    @apply antialiased scroll-smooth;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  
+  body {
+    @apply text-[rgb(var(--text-primary))];
+    @apply bg-[rgb(var(--bg-light))];
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+    @apply text-[rgb(var(--text-primary))];
+  }
+  
+  h1 { @apply text-4xl; }
+  h2 { @apply text-3xl; }
+  h3 { @apply text-2xl; }
+  h4 { @apply text-xl; }
+  h5 { @apply text-lg; }
+  h6 { @apply text-base; }
 }
-.btn-primary:hover{ filter:brightness(0.97); }
-.tab{ @apply px-4 py-1.5 rounded-full text-sm font-semibold transition; }
-.tab-active{ @apply bg-slate-900 text-white shadow; }
-.tab-passive{ @apply bg-slate-100 text-slate-700 hover:bg-slate-200; }
-.badge{ @apply inline-flex items-center rounded-full bg-slate-100 text-slate-700 px-2.5 py-1 text-xs; }
-.divider{ @apply h-px w-full bg-slate-200; }
-.brand-text{ @apply bg-clip-text text-transparent; background-image: linear-gradient(135deg,#0f172a,#3b82f6); }
+
+/* ========================================
+   🌿 ECO-CARD SYSTEM (GLASSMORPHIC)
+   ======================================== */
+
+.eco-card {
+  @apply relative overflow-hidden;
+  @apply bg-white/80 backdrop-blur-xl;
+  @apply border border-[rgb(var(--border-soft))]/60;
+  @apply rounded-2xl;
+  @apply p-6;
+  box-shadow: var(--shadow-sm);
+  transition: all var(--duration-base) var(--ease-smooth);
+}
+
+.eco-card::before {
+  content: '';
+  @apply absolute inset-0 opacity-0;
+  pointer-events: none;
+  background: linear-gradient(135deg, 
+    rgba(var(--eco-primary), 0.03) 0%, 
+    rgba(var(--eco-secondary), 0.03) 100%);
+  transition: opacity var(--duration-base) var(--ease-smooth);
+}
+
+.eco-card:hover::before {
+  @apply opacity-100;
+}
+
+.eco-card:hover {
+  @apply border-[rgb(var(--eco-primary))]/30;
+  box-shadow: var(--shadow-eco);
+  transform: translateY(-2px);
+}
+
+.eco-card-flat {
+  @apply bg-white/90 backdrop-blur-sm;
+  @apply border border-[rgb(var(--border-soft))];
+  @apply rounded-2xl p-6;
+  box-shadow: var(--shadow-xs);
+}
+
+/* ========================================
+   🧩 ECO-SECTIONS
+   ======================================== */
+
+.eco-section {
+  @apply space-y-6;
+}
+
+.eco-section-header {
+  @apply flex items-center justify-between;
+  @apply pb-4 border-b border-[rgb(var(--border-soft))];
+}
+
+.eco-section-title {
+  @apply text-2xl font-semibold;
+  @apply text-[rgb(var(--text-primary))];
+}
+
+.eco-section-subtitle {
+  @apply text-sm text-[rgb(var(--text-muted))];
+  @apply mt-1;
+}
+
+/* ========================================
+   🎯 ECO-BADGE SYSTEM
+   ======================================== */
+
+.eco-badge {
+  @apply inline-flex items-center gap-1.5;
+  @apply px-3 py-1.5;
+  @apply text-xs font-semibold;
+  @apply rounded-full;
+  @apply border;
+  transition: all var(--duration-fast) var(--ease-smooth);
+}
+
+.eco-badge-success {
+  @apply eco-badge;
+  @apply bg-emerald-50/80 text-emerald-700;
+  @apply border-emerald-200/60;
+}
+
+.eco-badge-warning {
+  @apply eco-badge;
+  @apply bg-amber-50/80 text-amber-700;
+  @apply border-amber-200/60;
+}
+
+.eco-badge-error {
+  @apply eco-badge;
+  @apply bg-red-50/80 text-red-700;
+  @apply border-red-200/60;
+}
+
+.eco-badge-info {
+  @apply eco-badge;
+  @apply bg-blue-50/80 text-blue-700;
+  @apply border-blue-200/60;
+}
+
+.eco-badge-neutral {
+  @apply eco-badge;
+  @apply bg-slate-100/80 text-slate-700;
+  @apply border-slate-200/60;
+}
+
+.eco-badge-primary {
+  @apply eco-badge;
+  @apply bg-[rgb(var(--eco-primary))]/10 text-[rgb(var(--eco-primary))];
+  @apply border-[rgb(var(--eco-primary))]/20;
+}
+
+/* ========================================
+   🔘 ECO-BUTTON SYSTEM
+   ======================================== */
+
+.eco-btn {
+  @apply inline-flex items-center justify-center gap-2;
+  @apply px-5 py-2.5;
+  @apply text-sm font-semibold;
+  @apply rounded-xl;
+  @apply transition-all;
+  @apply outline-none;
+  @apply cursor-pointer;
+  transition-duration: var(--duration-base);
+  transition-timing-function: var(--ease-smooth);
+}
+
+.eco-btn:focus-visible {
+  @apply ring-2 ring-offset-2 ring-[rgb(var(--eco-primary))];
+}
+
+.eco-btn:disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
+
+.eco-btn-primary {
+  @apply eco-btn;
+  @apply text-white;
+  background: linear-gradient(135deg, rgb(var(--eco-primary)) 0%, rgb(var(--eco-secondary)) 100%);
+  box-shadow: 0 4px 16px rgba(var(--eco-primary), 0.25);
+}
+
+.eco-btn-primary:hover:not(:disabled) {
+  box-shadow: 0 8px 24px rgba(var(--eco-primary), 0.35);
+  transform: translateY(-1px);
+}
+
+.eco-btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(var(--eco-primary), 0.25);
+}
+
+.eco-btn-secondary {
+  @apply eco-btn;
+  @apply bg-white/90 backdrop-blur-sm;
+  @apply border border-[rgb(var(--border-soft))];
+  @apply text-[rgb(var(--text-primary))];
+  box-shadow: var(--shadow-xs);
+}
+
+.eco-btn-secondary:hover:not(:disabled) {
+  @apply bg-slate-50;
+  @apply border-slate-300;
+  box-shadow: var(--shadow-sm);
+}
+
+.eco-btn-ghost {
+  @apply eco-btn;
+  @apply bg-transparent;
+  @apply text-[rgb(var(--text-muted))];
+}
+
+.eco-btn-ghost:hover:not(:disabled) {
+  @apply bg-slate-100/80;
+  @apply text-[rgb(var(--text-primary))];
+}
+
+.eco-btn-danger {
+  @apply eco-btn;
+  @apply bg-red-600 text-white;
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.25);
+}
+
+.eco-btn-danger:hover:not(:disabled) {
+  @apply bg-red-700;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.35);
+}
+
+.eco-btn-success {
+  @apply eco-btn;
+  @apply bg-[rgb(var(--success))] text-white;
+  box-shadow: 0 4px 16px rgba(var(--success), 0.25);
+}
+
+.eco-btn-success:hover:not(:disabled) {
+  @apply bg-green-600;
+  transform: translateY(-1px);
+}
+
+/* ========================================
+   📝 ECO-FORM ELEMENTS
+   ======================================== */
+
+.eco-label {
+  @apply block text-sm font-medium;
+  @apply text-[rgb(var(--text-primary))];
+  @apply mb-2;
+}
+
+.eco-input {
+  @apply w-full px-4 py-2.5;
+  @apply bg-white/90 backdrop-blur-sm;
+  @apply border border-[rgb(var(--border-soft))];
+  @apply rounded-xl;
+  @apply text-[rgb(var(--text-primary))];
+  @apply placeholder:text-[rgb(var(--text-muted))];
+  @apply outline-none;
+  @apply transition-all;
+  box-shadow: var(--shadow-xs);
+  transition-duration: var(--duration-base);
+}
+
+.eco-input:focus {
+  @apply border-[rgb(var(--eco-primary))];
+  @apply bg-white;
+  box-shadow: 0 0 0 3px rgba(var(--eco-primary), 0.1), var(--shadow-sm);
+}
+
+.eco-input:disabled {
+  @apply bg-slate-50 cursor-not-allowed opacity-60;
+}
+
+.eco-textarea {
+  @apply eco-input;
+  @apply min-h-[120px] resize-y;
+}
+
+.eco-select {
+  @apply eco-input;
+  @apply pr-10;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2364748B' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.75rem center;
+  background-repeat: no-repeat;
+  background-size: 1.25rem 1.25rem;
+  appearance: none;
+}
+
+/* ========================================
+   📊 ECO-STAT CARDS
+   ======================================== */
+
+.eco-stat {
+  @apply eco-card;
+  @apply flex flex-col gap-3;
+}
+
+.eco-stat-value {
+  @apply text-3xl font-bold;
+  @apply bg-clip-text text-transparent;
+  background-image: linear-gradient(135deg, rgb(var(--eco-primary)) 0%, rgb(var(--eco-secondary)) 100%);
+}
+
+.eco-stat-label {
+  @apply text-sm font-medium;
+  @apply text-[rgb(var(--text-muted))];
+}
+
+.eco-stat-icon {
+  @apply w-12 h-12 rounded-xl;
+  @apply flex items-center justify-center;
+  @apply bg-gradient-to-br from-[rgb(var(--eco-primary))]/10 to-[rgb(var(--eco-secondary))]/10;
+}
+
+/* ========================================
+   🎨 ECO-DIVIDER
+   ======================================== */
+
+.eco-divider {
+  @apply h-px w-full my-6;
+  background: linear-gradient(to right, 
+    transparent, 
+    rgb(var(--border-soft)), 
+    transparent);
+}
+
+.eco-divider-vertical {
+  @apply w-px h-full mx-4;
+  background: linear-gradient(to bottom, 
+    transparent, 
+    rgb(var(--border-soft)), 
+    transparent);
+}
+
+/* ========================================
+   🎬 ANIMATIONS & KEYFRAMES
+   ======================================== */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s var(--ease-smooth) backwards;
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgb(var(--neutral-100)) 0%,
+    rgb(var(--neutral-200)) 50%,
+    rgb(var(--neutral-100)) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s var(--ease-smooth) backwards;
+}
+
+/* ========================================
+   🎯 EMPTY STATES
+   ======================================== */
+
+.eco-empty-state {
+  @apply flex flex-col items-center justify-center;
+  @apply py-16 px-6;
+  @apply text-center;
+}
+
+.eco-empty-state-icon {
+  @apply w-16 h-16 mb-4;
+  @apply rounded-2xl;
+  @apply flex items-center justify-center;
+  @apply bg-gradient-to-br from-slate-100 to-slate-50;
+  @apply text-slate-400;
+}
+
+.eco-empty-state-title {
+  @apply text-lg font-semibold;
+  @apply text-[rgb(var(--text-primary))];
+  @apply mb-2;
+}
+
+.eco-empty-state-description {
+  @apply text-sm text-[rgb(var(--text-muted))];
+  @apply max-w-md;
+}
+
+/* ========================================
+   📱 RESPONSIVE UTILITIES
+   ======================================== */
+
+.container-eco {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+}
+
+/* ========================================
+   🎨 UTILITY CLASSES
+   ======================================== */
+
+.text-eco-primary {
+  color: rgb(var(--eco-primary));
+}
+
+.text-eco-secondary {
+  color: rgb(var(--eco-secondary));
+}
+
+.bg-eco-primary {
+  background-color: rgb(var(--eco-primary));
+}
+
+.bg-eco-secondary {
+  background-color: rgb(var(--eco-secondary));
+}
+
+.border-eco-primary {
+  border-color: rgb(var(--eco-primary));
+}
+
+.gradient-eco {
+  background: linear-gradient(135deg, rgb(var(--eco-primary)) 0%, rgb(var(--eco-secondary)) 100%);
+}
+
+.gradient-eco-light {
+  background: linear-gradient(135deg, 
+    rgba(var(--eco-primary), 0.1) 0%, 
+    rgba(var(--eco-secondary), 0.1) 100%);
+}
+
+.text-gradient-eco {
+  @apply bg-clip-text text-transparent;
+  background-image: linear-gradient(135deg, 
+    rgb(var(--eco-primary)) 0%, 
+    rgb(var(--eco-secondary)) 100%);
+}
+
+/* Focus visible utility */
+.focus-ring {
+  @apply outline-none transition-shadow;
+  transition-duration: var(--duration-base);
+}
+
+.focus-ring:focus-visible {
+  @apply ring-2 ring-offset-2;
+  ring-color: rgb(var(--eco-primary));
+}
+
+/* ========================================
+   🔄 BACKWARDS COMPATIBILITY
+   ======================================== */
+
+/* Legacy class support - maps to new system */
+.glass-card {
+  @apply eco-card;
+}
+
+.card {
+  @apply eco-card-flat;
+}
+
+.btn {
+  @apply eco-btn-secondary;
+}
+
+.btn-primary {
+  @apply eco-btn-primary;
+}
+
+.badge {
+  @apply eco-badge-neutral;
+}
+
+.label {
+  @apply eco-label;
+}
+
+.input {
+  @apply eco-input;
+}
+
+.divider {
+  @apply eco-divider;
+}
