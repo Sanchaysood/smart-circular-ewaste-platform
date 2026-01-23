@@ -8,3 +8,10 @@ aiofiles
 google-auth
 google-auth-oauthlib
 python-dotenv
+joblib
+scikit-learn
+pandas
+numpy
+pillow
+ultralytics
+opencv-python-headless
