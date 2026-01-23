@@ -9,7 +9,7 @@ google-auth
 google-auth-oauthlib
 python-dotenv
 joblib
-scikit-learn
+scikit-learn==1.6.1
 pandas
 numpy
 pillow
