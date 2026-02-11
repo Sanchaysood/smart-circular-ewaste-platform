@@ -263,7 +263,7 @@ export default function PartnerPage() {
     if (token) {
       loadLeads();
     }
-  }, [token]);
+  }, [token, loadLeads]);
 
   // --------- ACTIONS ON LEADS ----------
   // Use plural endpoints: /partners/leads/{id}/accept|reject|complete
@@ -556,7 +556,7 @@ export default function PartnerPage() {
             <div className="flex items-start gap-3">
               <span className="text-2xl">⚠️</span>
               <div className="text-sm text-amber-900">
-                Your account is not marked as a <strong>partner</strong> yet. Ask your admin to set <code className="bg-amber-100 px-1.5 py-0.5 rounded">role="partner"</code> in the database.
+                Your account is not marked as a <strong>partner</strong> yet. Ask your admin to set <code className="bg-amber-100 px-1.5 py-0.5 rounded">role=&quot;partner&quot;</code> in the database.
               </div>
             </div>
           </div>
