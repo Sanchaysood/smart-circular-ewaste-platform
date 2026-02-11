@@ -36,6 +36,8 @@ type Listing = {
   created_at: string | null;
 };
 
+export const dynamic = 'force-dynamic';
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [partners, setPartners] = useState<Partner[]>([]);

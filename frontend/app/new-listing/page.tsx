@@ -87,6 +87,8 @@ const labelInfo: Record<
   },
 };
 
+export const dynamic = 'force-dynamic';
+
 export default function NewListingPage() {
   const [auth, setAuth] = useState<AuthState>({ token: null, name: null });
   const [isLoading, setIsLoading] = useState(false);

@@ -42,6 +42,8 @@ function cx(...a: Array<string | false | null | undefined>) {
   return a.filter(Boolean).join(" ");
 }
 
+export const dynamic = 'force-dynamic';
+
 export default function PartnerPage() {
   const [token, setToken] = useState<string | null>(null);
   const [name, setName] = useState<string | null>(null);
