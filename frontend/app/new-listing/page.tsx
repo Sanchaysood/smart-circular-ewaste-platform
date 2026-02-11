@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import axios from "axios";
-import { useSearchParams } from "next/navigation";
 import toast from "react-hot-toast"; 
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -92,28 +91,37 @@ export const dynamic = 'force-dynamic';
 export default function NewListingPage() {
   const [auth, setAuth] = useState<AuthState>({ token: null, name: null });
   const [isLoading, setIsLoading] = useState(false);
-  
-  // Check if user is coming from partner portal
-  const searchParams = useSearchParams();
+  const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState<"login" | "register">("login");
   const [isPartnerFlow, setIsPartnerFlow] = useState(false);
 
-  // Initialize based on search params after mount
+  // Check URL params client-side only
   useEffect(() => {
-    if (searchParams?.get("partner") === "true") {
-      setIsPartnerFlow(true);
-      setTab("register");
-      setReg(prev => ({ ...prev, isPartner: true }));
+    setMounted(true);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("partner") === "true") {
+        setIsPartnerFlow(true);
+        setTab("register");
+      }
     }
-  }, [searchParams]);
+  }, []);
 
   const [reg, setReg] = useState({ 
     name: "", 
     email: "", 
     password: "", 
     confirmPassword: "", 
-    isPartner: isPartnerFlow // Auto-check partner checkbox if coming from partner portal
+    isPartner: false
   });
+
+  // Update partner checkbox when partner flow is detected
+  useEffect(() => {
+    if (isPartnerFlow) {
+      setReg(prev => ({ ...prev, isPartner: true }));
+    }
+  }, [isPartnerFlow]);
+
   const [login, setLogin] = useState({ email: "", password: "" });
   const [showForgot, setShowForgot] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
@@ -147,24 +155,30 @@ export default function NewListingPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // ---------- compute backHref from ?next=... ----------
-  const backHref = useMemo(() => {
-    const nextParamRaw = searchParams?.get("next") ?? "";
-    let href = "/"; // Go to main dashboard
-    if (nextParamRaw) {
-      try {
-        const decoded = decodeURIComponent(nextParamRaw);
-        // If they came from /partner, treat that as part of listing flow and send them to /new-listing instead
-        if (decoded === "/partner" || decoded.startsWith("/partner")) {
-          href = "/new-listing";
-        } else {
-          href = decoded;
+  const [backHref, setBackHref] = useState("/");
+
+  // Set backHref from URL on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const nextParamRaw = params.get("next") ?? "";
+      let href = "/"; // Go to main dashboard
+      if (nextParamRaw) {
+        try {
+          const decoded = decodeURIComponent(nextParamRaw);
+          // If they came from /partner, treat that as part of listing flow and send them to /new-listing instead
+          if (decoded === "/partner" || decoded.startsWith("/partner")) {
+            href = "/new-listing";
+          } else {
+            href = decoded;
+          }
+        } catch {
+          href = nextParamRaw;
         }
-      } catch {
-        href = nextParamRaw;
       }
+      setBackHref(href);
     }
-    return href;
-  }, [searchParams]);
+  }, []);
   // -----------------------------------------------------
 
   const isValidResult = (r: any) =>
