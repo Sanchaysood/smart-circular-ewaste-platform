@@ -95,8 +95,17 @@ export default function NewListingPage() {
   
   // Check if user is coming from partner portal
   const searchParams = useSearchParams();
-  const isPartnerFlow = searchParams?.get("partner") === "true";
-  const [tab, setTab] = useState<"login" | "register">(isPartnerFlow ? "register" : "login");
+  const [tab, setTab] = useState<"login" | "register">("login");
+  const [isPartnerFlow, setIsPartnerFlow] = useState(false);
+
+  // Initialize based on search params after mount
+  useEffect(() => {
+    if (searchParams?.get("partner") === "true") {
+      setIsPartnerFlow(true);
+      setTab("register");
+      setReg(prev => ({ ...prev, isPartner: true }));
+    }
+  }, [searchParams]);
 
   const [reg, setReg] = useState({ 
     name: "", 
@@ -138,21 +147,24 @@ export default function NewListingPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // ---------- compute backHref from ?next=... ----------
-  const nextParamRaw = searchParams?.get("next") ?? "";
-  let backHref = "/"; // Go to main dashboard
-  if (nextParamRaw) {
-    try {
-      const decoded = decodeURIComponent(nextParamRaw);
-      // If they came from /partner, treat that as part of listing flow and send them to /new-listing instead
-      if (decoded === "/partner" || decoded.startsWith("/partner")) {
-        backHref = "/new-listing";
-      } else {
-        backHref = decoded;
+  const backHref = useMemo(() => {
+    const nextParamRaw = searchParams?.get("next") ?? "";
+    let href = "/"; // Go to main dashboard
+    if (nextParamRaw) {
+      try {
+        const decoded = decodeURIComponent(nextParamRaw);
+        // If they came from /partner, treat that as part of listing flow and send them to /new-listing instead
+        if (decoded === "/partner" || decoded.startsWith("/partner")) {
+          href = "/new-listing";
+        } else {
+          href = decoded;
+        }
+      } catch {
+        href = nextParamRaw;
       }
-    } catch {
-      backHref = nextParamRaw;
     }
-  }
+    return href;
+  }, [searchParams]);
   // -----------------------------------------------------
 
   const isValidResult = (r: any) =>
